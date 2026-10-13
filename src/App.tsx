@@ -1,5 +1,6 @@
 import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type ChangeEvent, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
+import { ArrowLeft, Eye } from 'lucide-react'
 import * as XLSX from 'xlsx'
 import './App.css'
 
@@ -34,7 +35,7 @@ type Production = {
   ingredientCostPerBatch: number
   expectedSalePrice?: number
 }
-type Page = 'overview' | 'recipes' | 'production' | 'market'
+type Page = 'overview' | 'recipes' | 'recipe-detail' | 'production' | 'production-detail' | 'market'
 type PendingDelete =
   | { kind: 'recipe'; id: string; label: string }
   | { kind: 'production'; id: string; label: string }
@@ -326,6 +327,7 @@ function App() {
   const [productions, setProductions] = useState<Production[]>(initialData.productions)
   const [page, setPage] = useState<Page>('overview')
   const [selectedRecipeId, setSelectedRecipeId] = useState(recipes[0]?.id ?? '')
+  const [selectedProductionId, setSelectedProductionId] = useState('')
   const [search, setSearch] = useState('')
   const [priceDrafts, setPriceDrafts] = useState<Record<string, string>>({})
   const [notice, setNotice] = useState('')
@@ -368,7 +370,7 @@ function App() {
     const recipe: Recipe = { id: makeId(), name: '', category: '', yield: 0, hoursPerBatch: 0, ingredients: [] }
     setRecipes((current) => [...current, recipe])
     setSelectedRecipeId(recipe.id)
-    setPage('recipes')
+    setPage('recipe-detail')
   }
   const addMarketItem = () => setMarket((current) => [...current, { id: makeId(), name: '', unit: '', packageQty: 1, packagePrice: 0 }])
   const addIngredient = () => {
@@ -388,7 +390,8 @@ function App() {
       ingredientCostPerBatch: recipeCostPerBatch(recipe, market),
     }
     setProductions((current) => [production, ...current])
-    setPage('production')
+    setSelectedProductionId(production.id)
+    setPage('production-detail')
   }
   const updateProduction = (id: string, patch: Partial<Production>) => setProductions((current) => current.map((production) => production.id === id ? { ...production, ...patch } : production))
   const confirmDelete = () => {
@@ -396,9 +399,16 @@ function App() {
     if (pendingDelete.kind === 'recipe') {
       const next = recipes.filter((recipe) => recipe.id !== pendingDelete.id)
       setRecipes(next)
-      if (selectedRecipeId === pendingDelete.id) setSelectedRecipeId(next[0]?.id ?? '')
+      if (selectedRecipeId === pendingDelete.id) {
+        setSelectedRecipeId(next[0]?.id ?? '')
+        setPage('recipes')
+      }
     } else if (pendingDelete.kind === 'production') {
       setProductions((current) => current.filter((production) => production.id !== pendingDelete.id))
+      if (selectedProductionId === pendingDelete.id) {
+        setSelectedProductionId('')
+        setPage('production')
+      }
     } else if (pendingDelete.kind === 'market') {
       setMarket((current) => current.filter((item) => item.id !== pendingDelete.id))
       setRecipes((current) => current.map((recipe) => ({ ...recipe, ingredients: recipe.ingredients.filter((ingredient) => ingredient.marketItemId !== pendingDelete.id) })))
@@ -494,8 +504,8 @@ function App() {
         <div className="workspace-label">ESPAÇO DE TRABALHO</div>
         <nav className="main-nav" aria-label="Navegação principal">
           <button className={page === 'overview' ? 'nav-item active' : 'nav-item'} onClick={() => setPage('overview')}><Icon name="overview" /> Visão geral</button>
-          <button className={page === 'recipes' ? 'nav-item active' : 'nav-item'} onClick={() => setPage('recipes')}><Icon name="recipe" /> Receitas <span className="nav-count">{recipes.length}</span></button>
-          <button className={page === 'production' ? 'nav-item active' : 'nav-item'} onClick={() => setPage('production')}><Icon name="chart" /> Produção <span className="nav-count">{productions.length}</span></button>
+          <button className={page === 'recipes' || page === 'recipe-detail' ? 'nav-item active' : 'nav-item'} onClick={() => setPage('recipes')}><Icon name="recipe" /> Receitas <span className="nav-count">{recipes.length}</span></button>
+          <button className={page === 'production' || page === 'production-detail' ? 'nav-item active' : 'nav-item'} onClick={() => setPage('production')}><Icon name="chart" /> Produção <span className="nav-count">{productions.length}</span></button>
           <button className={page === 'market' ? 'nav-item active' : 'nav-item'} onClick={() => setPage('market')}><Icon name="market" /> Mercado <span className="nav-count">{market.length}</span></button>
         </nav>
         <div className="sidebar-bottom">
@@ -506,7 +516,7 @@ function App() {
 
       <main className="main-content">
         <header className="topbar">
-          <div className="breadcrumb">Painel <span>/</span> {page === 'overview' ? 'Visão geral' : page === 'recipes' ? 'Receitas' : page === 'production' ? 'Produção' : 'Mercado'}</div>
+          <div className="breadcrumb">Painel <span>/</span> {page === 'overview' ? 'Visão geral' : page === 'recipes' || page === 'recipe-detail' ? 'Receitas' : page === 'production' || page === 'production-detail' ? 'Produção' : 'Mercado'}{(page === 'recipe-detail' || page === 'production-detail') && <><span>/</span> Detalhes</>}</div>
           <div className="topbar-actions">
             <button className="text-button" onClick={exportWorkbook}><Icon name="download" size={16} /> Exportar Excel</button>
           </div>
@@ -558,16 +568,17 @@ function App() {
             <div className="footnote"><Icon name="check" size={14} /> Alterações em receitas e preços são salvas automaticamente neste dispositivo.</div>
           </>}
 
-          {page === 'recipes' && <>
-            <section className="welcome-row page-title-row"><div><div className="eyebrow"><span className="eyebrow-dot" /> FICHAS TÉCNICAS</div><h1>Receitas</h1><p>Cadastre ingredientes, quantidades por lote e rendimento de cada receita.</p></div><button className="button button-primary" onClick={addRecipe}><Icon name="plus" size={17} /> Nova receita</button></section>
-            <div className="recipe-workspace">
-              <section className="panel recipe-list-panel"><div className="panel-heading"><div><h2>Lista de receitas</h2><p>{recipes.length} receitas cadastradas</p></div><span className="list-count">{recipes.length}</span></div>
-                <div className="recipe-list">{recipes.map((recipe) => {
-                  return <button key={recipe.id} className={`recipe-list-item ${activeRecipe?.id === recipe.id ? 'selected' : ''}`} onClick={() => setSelectedRecipeId(recipe.id)}><span className="recipe-thumb">{recipe.name.slice(0, 1).toUpperCase()}</span><span className="list-recipe-info"><strong>{recipe.name || 'Receita sem nome'}</strong><small>{recipe.category || 'Sem categoria'} · rende {number(recipe.yield)} un.</small></span><span className="list-recipe-cost">{money(recipeCostPerBatch(recipe, market))}<small>por lote</small></span></button>
-                })}</div>
-                {!recipes.length && <div className="empty-inline">Cadastre uma receita para criar sua primeira ficha técnica.</div>}
-              </section>
-              {activeRecipe ? <section className="panel editor-panel">
+          {(page === 'recipes' || page === 'recipe-detail') && <>
+            {page === 'recipe-detail' && <button className="text-button detail-back" onClick={() => setPage('recipes')}><ArrowLeft size={17} aria-hidden="true" /> Voltar para receitas</button>}
+            <section className="welcome-row page-title-row"><div><div className="eyebrow"><span className="eyebrow-dot" /> FICHAS TÉCNICAS</div><h1>{page === 'recipe-detail' ? activeRecipe?.name || 'Receita sem nome' : 'Receitas'}</h1>{page === 'recipes' && <p>{recipes.length} receitas cadastradas</p>}</div>{page === 'recipes' && <button className="button button-primary" onClick={addRecipe}><Icon name="plus" size={17} /> Nova receita</button>}</section>
+            {page === 'recipes' ? <section className="item-list" aria-label="Lista de receitas">
+              {recipes.map((recipe) => <article className="item-summary" key={recipe.id}>
+                <div className="item-summary-name"><span className="recipe-thumb">{recipe.name.slice(0, 1).toUpperCase() || 'R'}</span><div><h2>{recipe.name || 'Receita sem nome'}</h2><span>{recipe.category || 'Sem categoria'}</span></div></div>
+                <dl className="item-summary-metrics"><div><dt>Rendimento / lote</dt><dd>{number(recipe.yield)} un.</dd></div><div><dt>Ingredientes</dt><dd>{number(recipe.ingredients.length)}</dd></div><div><dt>Custo / lote</dt><dd>{money(recipeCostPerBatch(recipe, market))}</dd></div></dl>
+                <button className="icon-button view-item" aria-label={`Visualizar receita ${recipe.name || 'sem nome'}`} title="Visualizar receita" onClick={() => { setSelectedRecipeId(recipe.id); setPage('recipe-detail') }}><Eye size={18} aria-hidden="true" /></button>
+              </article>)}
+              {!recipes.length && <div className="empty-inline">Cadastre uma receita para criar sua primeira ficha técnica.</div>}
+            </section> : activeRecipe ? <section className="panel editor-panel">
                 <div className="editor-heading"><div className="recipe-heading-icon">{activeRecipe.name.slice(0, 1).toUpperCase() || 'R'}</div><div className="editor-title">
                   <label className="recipe-edit-field"><span>Nome da receita</span><input className="recipe-title-input" aria-label="Nome da receita" placeholder="Ex.: Bolo de cenoura" value={activeRecipe.name} onChange={(event) => updateRecipe(activeRecipe.id, { name: event.target.value })} /></label>
                   <label className="recipe-edit-field"><span>Categoria</span><input className="category-input" aria-label="Categoria da receita" placeholder="Ex.: Bolos" value={activeRecipe.category} onChange={(event) => updateRecipe(activeRecipe.id, { category: event.target.value })} /></label>
@@ -582,15 +593,27 @@ function App() {
                 })}</tbody></table>{activeRecipe.ingredients.length === 0 && <div className="empty-inline">Adicione itens do mercado para calcular o custo desta receita.</div>}</div>
                 <p className="formula-note">Os ingredientes e quantidades formam a ficha de um lote. Os parâmetros de fabricação e resultados ficam registrados separadamente em Produção.</p>
               </section> : <section className="panel empty-editor"><span className="empty-illustration"><Icon name="recipe" size={28} /></span><h2>Nenhuma receita cadastrada</h2><p>Crie uma ficha técnica para usar nos registros de produção.</p><button className="button button-primary" onClick={addRecipe}><Icon name="plus" size={16} /> Criar receita</button></section>}
-            </div>
           </>}
 
-          {page === 'production' && <>
-            <section className="welcome-row page-title-row"><div><div className="eyebrow"><span className="eyebrow-dot" /> REGISTRO E RESULTADOS</div><h1>Produção</h1><p>Registre cada fabricação separadamente. Cada item guarda seus parâmetros e resultados daquele dia.</p></div><button className="button button-primary" onClick={addProduction} disabled={!recipes.length}><Icon name="plus" size={17} /> Registrar produção</button></section>
-            {!recipes.length ? <section className="panel empty-editor"><span className="empty-illustration"><Icon name="recipe" size={28} /></span><h2>Cadastre uma receita primeiro</h2><p>As fichas técnicas serão selecionadas ao criar cada registro de produção.</p><button className="button button-primary" onClick={() => setPage('recipes')}><Icon name="recipe" size={16} /> Ir para receitas</button></section>
-              : productions.length ? <section className="production-history">
-                <div className="history-caption"><span>{productions.length} registros</span><span>Cada registro é independente e preserva o custo do momento em que foi criado.</span></div>
-                {productions.slice().sort((a, b) => b.date.localeCompare(a.date)).map((production) => {
+          {(page === 'production' || page === 'production-detail') && <>
+            {page === 'production-detail' && <button className="text-button detail-back" onClick={() => setPage('production')}><ArrowLeft size={17} aria-hidden="true" /> Voltar para produção</button>}
+            <section className="welcome-row page-title-row"><div><div className="eyebrow"><span className="eyebrow-dot" /> REGISTRO E RESULTADOS</div><h1>{page === 'production-detail' ? 'Detalhes da produção' : 'Produção'}</h1>{page === 'production' && <p>{productions.length} registros de produção</p>}</div>{page === 'production' && <button className="button button-primary" onClick={addProduction} disabled={!recipes.length}><Icon name="plus" size={17} /> Registrar produção</button>}</section>
+            {page === 'production' && productions.length > 0 ? <section className="item-list" aria-label="Lista de produção">
+              {calculated.slice().sort((first, second) => second.date.localeCompare(first.date)).map((production) => {
+                const hasExpectedPrice = production.expectedSalePrice !== undefined
+                const revenue = (production.expectedSalePrice ?? production.salePrice) * production.packages
+                const balance = revenue - production.cost
+                const profit = hasExpectedPrice
+                  ? Math.abs(balance) <= Number.EPSILON * Math.max(1, Math.abs(revenue), Math.abs(production.cost)) ? 0 : balance
+                  : production.profit
+                return <article className="item-summary" key={production.id}>
+                <div className="item-summary-name"><span className="recipe-thumb">{production.recipeName.slice(0, 1).toUpperCase() || 'R'}</span><div><h2>{production.recipeName}</h2><span>{production.date ? new Intl.DateTimeFormat('pt-BR').format(new Date(`${production.date}T12:00:00`)) : 'Data não informada'} · {number(production.quantity)} lotes</span></div></div>
+                <dl className="item-summary-metrics"><div><dt>Pacotes</dt><dd>{number(production.packages)}</dd></div><div><dt>Custo registrado</dt><dd>{money(production.cost)}</dd></div><div><dt>{hasExpectedPrice ? 'Lucro esperado' : 'Lucro previsto'}</dt><dd>{hasExpectedPrice && production.packages === 0 ? '—' : money(profit)}</dd></div></dl>
+                <button className="icon-button view-item" aria-label={`Visualizar produção de ${production.recipeName} em ${production.date}`} title="Visualizar produção" onClick={() => { setSelectedProductionId(production.id); setPage('production-detail') }}><Eye size={18} aria-hidden="true" /></button>
+              </article>
+              })}
+            </section> : page === 'production-detail' ? <section className="production-history">
+                {productions.filter((production) => production.id === selectedProductionId).map((production) => {
                   const result = calculateProduction(production)
                   return <article className="panel production-record" key={production.id}>
                     <div className="production-record-heading">
@@ -620,7 +643,7 @@ function App() {
                     <SalePriceSimulation result={result} onPriceChange={(expectedSalePrice) => updateProduction(production.id, { expectedSalePrice })} />
                   </article>
                 })}
-              </section> : <section className="panel empty-editor"><span className="empty-illustration"><Icon name="chart" size={28} /></span><h2>Nenhuma produção registrada</h2><p>Crie um registro para informar qual receita foi feita, em que quantidade e quais foram os resultados.</p><button className="button button-primary" onClick={addProduction}><Icon name="plus" size={16} /> Registrar primeira produção</button></section>}
+              </section> : !recipes.length ? <section className="panel empty-editor"><span className="empty-illustration"><Icon name="recipe" size={28} /></span><h2>Cadastre uma receita primeiro</h2><p>As fichas técnicas serão selecionadas ao criar cada registro de produção.</p><button className="button button-primary" onClick={() => setPage('recipes')}><Icon name="recipe" size={16} /> Ir para receitas</button></section> : <section className="panel empty-editor"><span className="empty-illustration"><Icon name="chart" size={28} /></span><h2>Nenhuma produção registrada</h2><p>Crie um registro para informar qual receita foi feita, em que quantidade e quais foram os resultados.</p><button className="button button-primary" onClick={addProduction}><Icon name="plus" size={16} /> Registrar primeira produção</button></section>}
           </>}
 
           {page === 'market' && <>
