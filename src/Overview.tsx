@@ -118,7 +118,7 @@ export default function Overview({ productions, sales, recipeCount, marketCount,
         {rows.length ? <div className="overview-production-progress">{rows.slice(0, 6).map((production) => {
           const percent = production.packages > 0 ? Math.min(100, production.realized.packages / production.packages * 100) : 0
           return <div className="overview-progress-row" key={production.id}><div className="overview-progress-heading"><div><strong>{production.recipeName}</strong><small>{dateLabel(production.date)}</small></div><span>{count(production.realized.packages)} / {count(production.packages)} pacotes</span></div><progress aria-label={`Pacotes vendidos de ${production.recipeName} em ${production.date}`} value={production.realized.packages} max={Math.max(1, production.packages)} /><div className="overview-progress-footer"><span>{money(production.realized.revenue)} vendidos</span><span>{count(percent, 1)}% vendido</span></div></div>
-        })}</div> : <div className="empty-inline">Nenhuma produção registrada.</div>}
+        })}</div> : <div className="empty-inline overview-empty-brand"><img src="/brand/conta-de-chef-vertical.png" alt="" width="548" height="309" /><p>Nenhuma produção registrada.</p></div>}
       </section>
 
       <section className="overview-section" aria-labelledby="overview-planning-title">

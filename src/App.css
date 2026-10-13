@@ -29,10 +29,8 @@ button:disabled { opacity: .5; cursor: not-allowed; }
 .app-shell { min-height: 100vh; }
 .sidebar { width: 244px; position: fixed; inset: 0 auto 0 0; z-index: 3; display: flex; flex-direction: column; padding: 28px 17px 16px; background: #fff; border-right: 1px solid #edeee9; }
 .brand { display: flex; align-items: center; gap: 11px; padding: 3px 9px 39px; color: inherit; text-decoration: none; }
-.brand-mark { display: grid; place-items: center; width: 37px; height: 37px; border-radius: 12px; background: #436958; color: #fff; font-family: Manrope, sans-serif; font-size: 23px; font-weight: 800; line-height: 1; letter-spacing: -3px; padding-right: 3px; }
-.brand-mark span { color: #efc99d; }
-.brand-name { display: flex; flex-direction: column; font-family: Manrope, sans-serif; font-size: 16px; line-height: 17px; font-weight: 800; letter-spacing: -.65px; }
-.brand-name span { color: #738176; font-size: 13px; font-weight: 600; letter-spacing: -.2px; }
+.brand-logo-horizontal { display: block; width: 100%; height: auto; }
+.brand-logo-symbol { display: none; width: 40px; height: 42px; object-fit: contain; }
 .workspace-label { padding: 0 11px 11px; color: #9ba19a; font-size: 9px; font-weight: 700; letter-spacing: 1.1px; }
 .main-nav { display: grid; gap: 5px; }
 .nav-item { display: flex; align-items: center; gap: 12px; height: 43px; width: 100%; padding: 0 12px; border: 0; border-radius: 8px; background: transparent; color: #69716a; text-align: left; font-size: 13px; font-weight: 500; transition: background .18s, color .18s; }
@@ -282,7 +280,8 @@ h1 { color: #2a312a; font-family: Manrope, 'DM Sans', sans-serif; font-size: 28p
 @media (max-width: 920px) {
   .sidebar { width: 70px; align-items: center; padding: 20px 9px 13px; }
   .brand { padding: 0 0 37px; }
-  .brand-name, .workspace-label { display: none; }
+  .brand-logo-horizontal, .workspace-label { display: none; }
+  .brand-logo-symbol { display: block; }
   .main-nav { width: 100%; }
   .nav-item { justify-content: center; gap: 0; padding: 0; font-size: 0; }
   .nav-count { display: none; }
@@ -300,7 +299,7 @@ h1 { color: #2a312a; font-family: Manrope, 'DM Sans', sans-serif; font-size: 28p
 @media (max-width: 680px) {
   body { min-width: 360px; }
   .sidebar { width: 56px; padding: 16px 6px 10px; }
-  .brand-mark { width: 34px; height: 34px; }
+  .brand-logo-symbol { width: 34px; height: 36px; }
   .main-content { margin-left: 56px; }
   .topbar { height: 57px; padding: 0 15px; }
   .topbar-actions { gap: 8px; }
@@ -630,6 +629,7 @@ h1 { font-size: 32px; }
 .overview-section { min-width: 0; padding: 20px 0; border-bottom: 1px solid var(--line); }
 .overview-section > .panel-heading { align-items: center; margin-bottom: 18px; }
 .overview-section .panel-heading h2 { letter-spacing: 0; }
+.overview-empty-brand img { display: block; width: 180px; max-width: 100%; height: auto; margin: 0 auto 18px; }
 .overview-production-progress { display: grid; gap: 18px; }
 .overview-progress-heading, .overview-progress-footer { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .overview-progress-heading > div { min-width: 0; }

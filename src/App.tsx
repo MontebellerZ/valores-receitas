@@ -505,7 +505,7 @@ function App() {
       return { Data: production.date, Receita: production.recipeName, 'Qtd. receitas': production.quantity, 'Rendimento obtido': production.actualYield, Perdas: production.losses, 'Rendimento líquido': result.produced, 'Qtd. por pacote': production.packageQty, 'Acréscimo sobre custo (%)': production.margin, Custo: result.cost, Pacotes: result.packages, 'Preço sugerido': result.salePrice, Faturamento: result.revenue, Lucro: result.profit }
     })), 'Produções')
     XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(sales.map((sale) => ({ 'Data da venda': sale.date, 'Data da produção': sale.productionDate, Receita: sale.recipeName, Cliente: sale.customer, Pacotes: sale.packages, 'Preço real por pacote': sale.pricePerPackage, Total: sale.packages * sale.pricePerPackage, Recebido: sale.paid ? 'Sim' : 'Não', 'Custo dos pacotes vendidos': sale.packages * sale.costPerPackage, 'Resultado da venda': sale.packages * (sale.pricePerPackage - sale.costPerPackage), Observações: sale.notes }))), 'Vendas')
-    XLSX.writeFile(workbook, 'doce-controle.xlsx')
+    XLSX.writeFile(workbook, 'conta-de-chef.xlsx')
   }
 
   const importWorkbook = async (event: ChangeEvent<HTMLInputElement>) => {
@@ -576,9 +576,9 @@ function App() {
   return (
     <div className="app-shell">
       <aside className="sidebar">
-        <a className="brand" href="#inicio" onClick={() => setPage('overview')} aria-label="Doce Controle, início">
-          <span className="brand-mark">d<span>.</span></span>
-          <span className="brand-name">doce<span>controle</span></span>
+        <a className="brand" href="#inicio" onClick={() => setPage('overview')} aria-label="Conta de Chef, início">
+          <img className="brand-logo-horizontal" src="/brand/conta-de-chef-horizontal.png" alt="" width="624" height="194" />
+          <img className="brand-logo-symbol" src="/brand/conta-de-chef-symbol.png" alt="" width="462" height="478" />
         </a>
         <div className="workspace-label">ESPAÇO DE TRABALHO</div>
         <nav className="main-nav" aria-label="Navegação principal">
@@ -590,7 +590,7 @@ function App() {
         </nav>
         <div className="sidebar-bottom">
           <div className="sync-status"><span className="status-dot" /><div><strong>Dados salvos</strong><small>neste dispositivo</small></div></div>
-          <div className="profile"><div className="avatar">DC</div><div><strong>Minha confeitaria</strong><small>Plano pessoal</small></div><span className="profile-dots">···</span></div>
+          <div className="profile"><div className="avatar">CC</div><div><strong>Minha confeitaria</strong><small>Plano pessoal</small></div><span className="profile-dots">···</span></div>
         </div>
       </aside>
 
