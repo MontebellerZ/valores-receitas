@@ -1,7 +1,8 @@
 import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type ChangeEvent, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
-import { ArrowLeft, Eye } from 'lucide-react'
+import { ArrowLeft, Eye, ShoppingBag } from 'lucide-react'
 import * as XLSX from 'xlsx'
+import Sales, { type Sale, type SaleDraft } from './Sales'
 import './App.css'
 
 type MarketItem = {
@@ -35,10 +36,11 @@ type Production = {
   ingredientCostPerBatch: number
   expectedSalePrice?: number
 }
-type Page = 'overview' | 'recipes' | 'recipe-detail' | 'production' | 'production-detail' | 'market'
+type Page = 'overview' | 'recipes' | 'recipe-detail' | 'production' | 'production-detail' | 'market' | 'sales'
 type PendingDelete =
   | { kind: 'recipe'; id: string; label: string }
   | { kind: 'production'; id: string; label: string }
+  | { kind: 'sale'; id: string; label: string }
   | { kind: 'market'; id: string; label: string; ingredientCount: number }
   | { kind: 'ingredient'; recipeId: string; id: string; label: string }
 type CalculatedProduction = Production & {
@@ -84,11 +86,11 @@ function calculateProduction(production: Production): CalculatedProduction {
   return { ...production, cost, produced, packages, costPerPackage, salePrice, revenue, profit }
 }
 
-function readSavedData(): { market: MarketItem[]; recipes: Recipe[]; productions: Production[] } {
+function readSavedData(): { market: MarketItem[]; recipes: Recipe[]; productions: Production[]; sales: Sale[] } {
   try {
     const saved = localStorage.getItem(STORAGE_KEY)
     if (saved) {
-      const parsed = JSON.parse(saved) as { market?: MarketItem[]; recipes?: Array<Recipe & Partial<{ quantity: number; losses: number; margin: number; packageQty: number }>>; productions?: Production[] }
+      const parsed = JSON.parse(saved) as { market?: MarketItem[]; recipes?: Array<Recipe & Partial<{ quantity: number; losses: number; margin: number; packageQty: number }>>; productions?: Production[]; sales?: Sale[] }
       if (Array.isArray(parsed.market) && Array.isArray(parsed.recipes)) {
         const market = parsed.market.map((item) => Object.fromEntries(Object.entries(item).filter(([key]) => key !== 'category')) as MarketItem)
         const recipes: Recipe[] = parsed.recipes.map((recipe) => ({
@@ -114,13 +116,14 @@ function readSavedData(): { market: MarketItem[]; recipes: Recipe[]; productions
             yieldPerBatch: recipe.yield, ingredientCostPerBatch: recipeCostPerBatch(recipe, market),
           }]
         })
-        return { market, recipes, productions }
+        const sales = Array.isArray(parsed.sales) ? parsed.sales.filter((sale) => sale && typeof sale.id === 'string' && typeof sale.productionId === 'string' && typeof sale.recipeName === 'string' && typeof sale.date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(sale.date) && Number.isFinite(new Date(`${sale.date}T12:00:00`).getTime()) && Number.isInteger(sale.packages) && sale.packages > 0 && Number.isFinite(sale.pricePerPackage) && sale.pricePerPackage >= 0 && Number.isFinite(sale.costPerPackage) && sale.costPerPackage >= 0).map((sale) => ({ ...sale, customer: sale.customer ?? '', notes: sale.notes ?? '', paid: sale.paid === true, productionDate: sale.productionDate ?? '' })) : []
+        return { market, recipes, productions, sales }
       }
     }
   } catch {
     // Dados inválidos são ignorados; sem dados salvos, a aplicação inicia vazia.
   }
-  return { market: [], recipes: [], productions: [] }
+  return { market: [], recipes: [], productions: [], sales: [] }
 }
 
 function normalize(value: unknown) {
@@ -325,6 +328,7 @@ function App() {
   const [market, setMarket] = useState<MarketItem[]>(initialData.market)
   const [recipes, setRecipes] = useState<Recipe[]>(initialData.recipes)
   const [productions, setProductions] = useState<Production[]>(initialData.productions)
+  const [sales, setSales] = useState<Sale[]>(initialData.sales)
   const [page, setPage] = useState<Page>('overview')
   const [selectedRecipeId, setSelectedRecipeId] = useState(recipes[0]?.id ?? '')
   const [selectedProductionId, setSelectedProductionId] = useState('')
@@ -334,7 +338,7 @@ function App() {
   const [pendingDelete, setPendingDelete] = useState<PendingDelete | null>(null)
   const fileInput = useRef<HTMLInputElement>(null)
 
-  useEffect(() => { localStorage.setItem(STORAGE_KEY, JSON.stringify({ market, recipes, productions })) }, [market, recipes, productions])
+  useEffect(() => { localStorage.setItem(STORAGE_KEY, JSON.stringify({ market, recipes, productions, sales })) }, [market, recipes, productions, sales])
 
   useEffect(() => {
     if (!pendingDelete) return
@@ -393,7 +397,44 @@ function App() {
     setSelectedProductionId(production.id)
     setPage('production-detail')
   }
-  const updateProduction = (id: string, patch: Partial<Production>) => setProductions((current) => current.map((production) => production.id === id ? { ...production, ...patch } : production))
+  const updateProduction = (id: string, patch: Partial<Production>) => {
+    const production = productions.find((entry) => entry.id === id)
+    if (!production) return
+    const linkedSales = sales.filter((sale) => sale.productionId === id)
+    const sold = linkedSales.reduce((total, sale) => total + sale.packages, 0)
+    if (linkedSales.length && ((patch.recipeId !== undefined && patch.recipeId !== production.recipeId) || (patch.packageQty !== undefined && patch.packageQty !== production.packageQty))) {
+      setNotice('Esta produção já possui vendas. A receita e a quantidade por pacote não podem ser alteradas enquanto houver vendas vinculadas.')
+      return
+    }
+    if (calculateProduction({ ...production, ...patch }).packages < sold) {
+      setNotice(`Esta produção já tem ${number(sold)} pacotes vendidos. O rendimento não pode ficar abaixo desse total.`)
+      return
+    }
+    if (patch.date && linkedSales.some((sale) => sale.date < patch.date!)) {
+      setNotice('A data da produção não pode ser posterior às vendas já registradas.')
+      return
+    }
+    setProductions((current) => current.map((entry) => entry.id === id ? { ...entry, ...patch } : entry))
+  }
+  const saveSale = (draft: SaleDraft): string | undefined => {
+    const production = calculated.find((entry) => entry.id === draft.productionId)
+    if (!production) return 'A produção selecionada não está disponível.'
+    const existing = draft.id ? sales.find((sale) => sale.id === draft.id) : undefined
+    if (draft.id && !existing) return 'Esta venda não está mais disponível.'
+    if (!Number.isInteger(draft.packages) || draft.packages <= 0 || !Number.isFinite(draft.pricePerPackage) || draft.pricePerPackage < 0 || !Number.isFinite(draft.packages * draft.pricePerPackage)) return 'Informe uma quantidade e um preço válidos.'
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(draft.date) || !Number.isFinite(new Date(`${draft.date}T12:00:00`).getTime()) || (production.date && draft.date < production.date)) return 'A data da venda deve ser igual ou posterior à produção.'
+    const sold = sales.filter((sale) => sale.productionId === production.id && sale.id !== draft.id).reduce((total, sale) => total + sale.packages, 0)
+    if (sold + draft.packages > production.packages) return `Esta produção tem apenas ${number(Math.max(0, production.packages - sold))} pacotes disponíveis.`
+    const sameProduction = existing?.productionId === production.id
+    const sale: Sale = {
+      ...draft, id: existing?.id ?? makeId(),
+      recipeName: sameProduction ? existing.recipeName : production.recipeName,
+      productionDate: sameProduction ? existing.productionDate : production.date,
+      costPerPackage: sameProduction ? existing.costPerPackage : production.costPerPackage,
+    }
+    setSales((current) => existing ? current.map((entry) => entry.id === existing.id ? sale : entry) : [sale, ...current])
+    return undefined
+  }
   const confirmDelete = () => {
     if (!pendingDelete) return
     if (pendingDelete.kind === 'recipe') {
@@ -404,11 +445,18 @@ function App() {
         setPage('recipes')
       }
     } else if (pendingDelete.kind === 'production') {
+      if (sales.some((sale) => sale.productionId === pendingDelete.id)) {
+        setNotice('Esta produção possui vendas registradas. Exclua as vendas vinculadas antes de remover a produção.')
+        setPendingDelete(null)
+        return
+      }
       setProductions((current) => current.filter((production) => production.id !== pendingDelete.id))
       if (selectedProductionId === pendingDelete.id) {
         setSelectedProductionId('')
         setPage('production')
       }
+    } else if (pendingDelete.kind === 'sale') {
+      setSales((current) => current.filter((sale) => sale.id !== pendingDelete.id))
     } else if (pendingDelete.kind === 'market') {
       setMarket((current) => current.filter((item) => item.id !== pendingDelete.id))
       setRecipes((current) => current.map((recipe) => ({ ...recipe, ingredients: recipe.ingredients.filter((ingredient) => ingredient.marketItemId !== pendingDelete.id) })))
@@ -426,6 +474,7 @@ function App() {
       const result = calculateProduction(production)
       return { Data: production.date, Receita: production.recipeName, 'Qtd. receitas': production.quantity, 'Rendimento obtido': production.actualYield, Perdas: production.losses, 'Rendimento líquido': result.produced, 'Qtd. por pacote': production.packageQty, 'Acréscimo sobre custo (%)': production.margin, Custo: result.cost, Pacotes: result.packages, 'Preço sugerido': result.salePrice, Faturamento: result.revenue, Lucro: result.profit }
     })), 'Produções')
+    XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(sales.map((sale) => ({ 'Data da venda': sale.date, 'Data da produção': sale.productionDate, Receita: sale.recipeName, Cliente: sale.customer, Pacotes: sale.packages, 'Preço real por pacote': sale.pricePerPackage, Total: sale.packages * sale.pricePerPackage, Recebido: sale.paid ? 'Sim' : 'Não', 'Custo dos pacotes vendidos': sale.packages * sale.costPerPackage, 'Resultado da venda': sale.packages * (sale.pricePerPackage - sale.costPerPackage), Observações: sale.notes }))), 'Vendas')
     XLSX.writeFile(workbook, 'doce-controle.xlsx')
   }
 
@@ -506,6 +555,7 @@ function App() {
           <button className={page === 'overview' ? 'nav-item active' : 'nav-item'} onClick={() => setPage('overview')}><Icon name="overview" /> Visão geral</button>
           <button className={page === 'recipes' || page === 'recipe-detail' ? 'nav-item active' : 'nav-item'} onClick={() => setPage('recipes')}><Icon name="recipe" /> Receitas <span className="nav-count">{recipes.length}</span></button>
           <button className={page === 'production' || page === 'production-detail' ? 'nav-item active' : 'nav-item'} onClick={() => setPage('production')}><Icon name="chart" /> Produção <span className="nav-count">{productions.length}</span></button>
+          <button className={page === 'sales' ? 'nav-item active' : 'nav-item'} title="Vendas" onClick={() => setPage('sales')}><ShoppingBag size={18} aria-hidden="true" /> Vendas <span className="nav-count">{sales.length}</span></button>
           <button className={page === 'market' ? 'nav-item active' : 'nav-item'} onClick={() => setPage('market')}><Icon name="market" /> Mercado <span className="nav-count">{market.length}</span></button>
         </nav>
         <div className="sidebar-bottom">
@@ -516,7 +566,7 @@ function App() {
 
       <main className="main-content">
         <header className="topbar">
-          <div className="breadcrumb">Painel <span>/</span> {page === 'overview' ? 'Visão geral' : page === 'recipes' || page === 'recipe-detail' ? 'Receitas' : page === 'production' || page === 'production-detail' ? 'Produção' : 'Mercado'}{(page === 'recipe-detail' || page === 'production-detail') && <><span>/</span> Detalhes</>}</div>
+          <div className="breadcrumb">Painel <span>/</span> {page === 'overview' ? 'Visão geral' : page === 'recipes' || page === 'recipe-detail' ? 'Receitas' : page === 'production' || page === 'production-detail' ? 'Produção' : page === 'sales' ? 'Vendas' : 'Mercado'}{(page === 'recipe-detail' || page === 'production-detail') && <><span>/</span> Detalhes</>}</div>
           <div className="topbar-actions">
             <button className="text-button" onClick={exportWorkbook}><Icon name="download" size={16} /> Exportar Excel</button>
           </div>
@@ -524,6 +574,7 @@ function App() {
 
         <div className="page-wrap">
           {notice && <div className="notice" role="status"><Icon name="check" size={17} />{notice}<button onClick={() => setNotice('')} aria-label="Fechar aviso"><Icon name="close" size={16} /></button></div>}
+          {page === 'sales' && <Sales productions={calculated} sales={sales} onSave={saveSale} onDelete={(sale) => setPendingDelete({ kind: 'sale', id: sale.id, label: `${sale.recipeName} — ${sale.date}` })} onViewProduction={(id) => { setSelectedProductionId(id); setPage(id ? 'production-detail' : 'production') }} />}
           {page === 'overview' && <>
             <section className="welcome-row">
               <div><div className="eyebrow"><span className="eyebrow-dot" /> SEU NEGÓCIO, EM NÚMEROS</div><h1>Visão geral</h1><p>Um resumo claro dos custos e do potencial das suas receitas.</p></div>
@@ -679,6 +730,8 @@ function App() {
               ? `A receita “${pendingDelete.label}” será excluída permanentemente.`
               : pendingDelete.kind === 'production'
                 ? `O registro de produção “${pendingDelete.label}” será removido do histórico.`
+                : pendingDelete.kind === 'sale'
+                  ? `A venda “${pendingDelete.label}” será excluída. Os pacotes voltarão ao saldo disponível e os totais de vendas serão recalculados.`
                 : pendingDelete.kind === 'market'
                 ? `O item “${pendingDelete.label}” será excluído${pendingDelete.ingredientCount ? ` e removido de ${pendingDelete.ingredientCount} ${pendingDelete.ingredientCount === 1 ? 'receita' : 'receitas'}` : ''}. Esta ação não pode ser desfeita.`
                 : `O ingrediente “${pendingDelete.label}” será removido desta receita.`}
