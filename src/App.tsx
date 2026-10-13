@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom'
 import { ArrowLeft, Eye, ShoppingBag } from 'lucide-react'
 import * as XLSX from 'xlsx'
 import Sales, { type Sale, type SaleDraft } from './Sales'
+import Overview from './Overview'
 import './App.css'
 
 type MarketItem = {
@@ -323,6 +324,42 @@ function SalePriceSimulation({ result, onPriceChange }: { result: CalculatedProd
   </section>
 }
 
+function RealizedSales({ production, sales, onViewSales }: { production: CalculatedProduction; sales: Sale[]; onViewSales: () => void }) {
+  const headingId = useId()
+  const linkedSales = sales.filter((sale) => sale.productionId === production.id).slice().sort((first, second) => first.date.localeCompare(second.date) || first.id.localeCompare(second.id))
+  const totals = linkedSales.reduce((total, sale) => {
+    const revenue = sale.packages * sale.pricePerPackage
+    return {
+      packages: total.packages + sale.packages,
+      revenue: total.revenue + revenue,
+      received: total.received + (sale.paid ? revenue : 0),
+      pending: total.pending + (sale.paid ? 0 : revenue),
+      cost: total.cost + sale.packages * sale.costPerPackage,
+    }
+  }, { packages: 0, revenue: 0, received: 0, pending: 0, cost: 0 })
+  const balance = totals.revenue - totals.cost
+  const profit = Math.abs(balance) <= Number.EPSILON * Math.max(1, Math.abs(totals.revenue), Math.abs(totals.cost)) ? 0 : balance
+  const history = linkedSales.reduce<Array<{ sale: Sale; accumulated: number }>>((rows, sale) => {
+    rows.push({ sale, accumulated: (rows.at(-1)?.accumulated ?? 0) + sale.packages * sale.pricePerPackage })
+    return rows
+  }, [])
+
+  return <section className="sale-simulation" aria-labelledby={headingId}>
+    <div className="panel-heading"><h2 id={headingId}>Venda realizada</h2><button className="inline-link" onClick={onViewSales}>Ver vendas <Icon name="arrow" size={14} /></button></div>
+    <div className="production-results simulation-results" aria-live="polite">
+      <div><span>Pacotes vendidos</span><strong>{number(totals.packages)}</strong></div>
+      <div><span>Pacotes disponíveis</span><strong>{number(Math.max(0, production.packages - totals.packages))}</strong></div>
+      <div><span>Faturamento vendido</span><strong>{money(totals.revenue)}</strong></div>
+      <div><span>Recebido</span><strong>{money(totals.received)}</strong></div>
+      <div><span>A receber</span><strong>{money(totals.pending)}</strong></div>
+      <div><span title="Faturamento vendido menos o custo histórico de ingredientes dos pacotes vendidos">Resultado das vendas</span><strong className={profit < 0 ? 'text-negative' : undefined}>{money(profit)}</strong><small className="production-breakdown">Custo dos vendidos: {money(totals.cost)}</small></div>
+    </div>
+    {history.length ? <div className="table-scroll realized-sales-history"><table className="data-table sales-table"><thead><tr><th>Data da venda</th><th>Cliente</th><th>Pacotes</th><th>Preço / pacote</th><th>Total</th><th>Faturamento acumulado</th><th>Pagamento</th></tr></thead><tbody>{history.map(({ sale, accumulated }) => <tr key={sale.id}>
+      <td>{new Intl.DateTimeFormat('pt-BR').format(new Date(`${sale.date}T12:00:00`))}</td><td>{sale.customer || '—'}</td><td>{number(sale.packages)}</td><td>{money(sale.pricePerPackage)}</td><td>{money(sale.packages * sale.pricePerPackage)}</td><td className="price-cell">{money(accumulated)}</td><td><span className={`sales-payment ${sale.paid ? 'is-paid' : ''}`}>{sale.paid ? 'Recebido' : 'A receber'}</span></td>
+    </tr>)}</tbody></table></div> : <div className="empty-inline">Nenhuma venda registrada para esta produção.</div>}
+  </section>
+}
+
 function App() {
   const [initialData] = useState(readSavedData)
   const [market, setMarket] = useState<MarketItem[]>(initialData.market)
@@ -350,13 +387,6 @@ function App() {
   }, [pendingDelete])
 
   const calculated = useMemo(() => productions.map(calculateProduction), [productions])
-  const totals = useMemo(() => calculated.reduce((acc, production) => ({
-    revenue: acc.revenue + production.revenue,
-    cost: acc.cost + production.cost,
-    profit: acc.profit + production.profit,
-    packages: acc.packages + production.packages,
-    produced: acc.produced + production.produced,
-  }), { revenue: 0, cost: 0, profit: 0, packages: 0, produced: 0 }), [calculated])
   const activeRecipe = recipes.find((recipe) => recipe.id === selectedRecipeId) ?? recipes[0]
   const activeRecipeCost = activeRecipe ? recipeCostPerBatch(activeRecipe, market) : 0
   const sortedMarket = useMemo(() => [...market].sort((a, b) => a.name.localeCompare(b.name, 'pt-BR', { sensitivity: 'base', numeric: true })), [market])
@@ -575,49 +605,7 @@ function App() {
         <div className="page-wrap">
           {notice && <div className="notice" role="status"><Icon name="check" size={17} />{notice}<button onClick={() => setNotice('')} aria-label="Fechar aviso"><Icon name="close" size={16} /></button></div>}
           {page === 'sales' && <Sales productions={calculated} sales={sales} onSave={saveSale} onDelete={(sale) => setPendingDelete({ kind: 'sale', id: sale.id, label: `${sale.recipeName} — ${sale.date}` })} onViewProduction={(id) => { setSelectedProductionId(id); setPage(id ? 'production-detail' : 'production') }} />}
-          {page === 'overview' && <>
-            <section className="welcome-row">
-              <div><div className="eyebrow"><span className="eyebrow-dot" /> SEU NEGÓCIO, EM NÚMEROS</div><h1>Visão geral</h1><p>Um resumo claro dos custos e do potencial das suas receitas.</p></div>
-              <div className="welcome-actions"><input ref={fileInput} type="file" accept=".xlsx,.xls,.csv" onChange={importWorkbook} hidden /><button className="button button-secondary" onClick={() => fileInput.current?.click()}><Icon name="upload" size={17} /> Importar planilha</button></div>
-            </section>
-
-            <section className="metric-grid" aria-label="Resumo financeiro">
-              <article className="metric-card"><div className="metric-top"><span>Faturamento previsto</span><span className="metric-icon mint"><Icon name="chart" /></span></div><strong>{money(totals.revenue)}</strong><div className="metric-foot"><span>projeção dos registros</span><span>de produção</span></div></article>
-              <article className="metric-card"><div className="metric-top"><span>Custo de produção</span><span className="metric-icon peach"><Icon name="wallet" /></span></div><strong>{money(totals.cost)}</strong><div className="metric-foot"><span>Soma dos custos registrados</span></div></article>
-              <article className="metric-card"><div className="metric-top"><span>Lucro previsto</span><span className="metric-icon lavender"><Icon name="chart" /></span></div><strong>{money(totals.profit)}</strong><div className="metric-foot"><span className={totals.profit >= 0 ? 'text-positive' : 'text-negative'}>{totals.revenue > 0 ? `${number(totals.profit / totals.revenue * 100, 1)}%` : '0%'} de margem média</span></div></article>
-              <article className="metric-card"><div className="metric-top"><span>Pacotes produzidos</span><span className="metric-icon yellow"><Icon name="package" /></span></div><strong>{number(totals.packages)}</strong><div className="metric-foot"><span>{number(totals.produced)} unidades líquidas</span></div></article>
-            </section>
-
-            <section className="overview-grid">
-              <article className="panel revenue-panel">
-                <div className="panel-heading"><div><h2>Resultados por produção</h2><p>Faturamento registrado em cada produção</p></div><span className="period-pill"><span /> Histórico</span></div>
-                {calculated.length ? <div className="chart-area">
-                  <div className="chart-y-labels"><span>{money(Math.max(1, ...calculated.map((r) => r.revenue)))}</span><span>{money(Math.max(1, ...calculated.map((r) => r.revenue)) / 2)}</span><span>R$ 0</span></div>
-                  <div className="bar-chart">{calculated.slice(0, 6).map((production, index) => {
-                    const max = Math.max(1, ...calculated.map((entry) => entry.revenue))
-                    return <div className="bar-column" key={production.id}><div className="bar-value">{money(production.revenue)}</div><div className="bar-track"><div className={`bar-fill bar-${index % 4}`} style={{ height: `${Math.max(production.revenue > 0 ? 8 : 0, production.revenue / max * 100)}%` }} /></div><span className="bar-label">{production.recipeName}</span></div>
-                  })}</div>
-                </div> : <div className="empty-state">Registre uma produção para visualizar seus resultados.</div>}
-                <div className="chart-legend"><span><i /> Faturamento registrado</span><span className="chart-note">Cada registro preserva custo e rendimento do momento da produção.</span></div>
-              </article>
-
-              <article className="panel quick-panel">
-                <div className="panel-heading"><div><h2>Resumo do negócio</h2><p>Seu planejamento atual</p></div><span className="round-icon"><Icon name="overview" size={17} /></span></div>
-                <div className="quick-total"><span>Lucro previsto acumulado</span><strong>{money(totals.profit)}</strong></div>
-                <div className="quick-progress"><div style={{ width: `${Math.min(100, totals.revenue > 0 ? Math.max(0, totals.profit / totals.revenue * 100) : 0)}%` }} /></div>
-                <div className="quick-row"><span><i className="legend-dot dot-cost" /> Custo total</span><strong>{money(totals.cost)}</strong></div>
-                <div className="quick-row"><span><i className="legend-dot dot-profit" /> Lucro estimado</span><strong>{money(totals.profit)}</strong></div>
-                <div className="quick-divider" />
-                <div className="quick-foot"><span><b>{productions.length}</b> registros de produção</span><button className="inline-link" onClick={() => setPage('production')}>Ver produção <Icon name="arrow" size={14} /></button></div>
-              </article>
-            </section>
-
-            <section className="panel recipe-summary-panel">
-              <div className="panel-heading"><div><h2>Histórico de produção recente</h2><p>Resultados de cada registro de produção</p></div><button className="inline-link" onClick={() => setPage('production')}>Ver histórico <Icon name="arrow" size={14} /></button></div>
-              {calculated.length ? <div className="table-scroll"><table className="data-table overview-table"><thead><tr><th>Data</th><th>Receita</th><th>Qtd. lotes</th><th>Rendimento líquido</th><th>Custo</th><th>Preço por pacote</th><th>Faturamento</th></tr></thead><tbody>{calculated.slice(0, 5).map((production) => <tr key={production.id}><td>{production.date}</td><td><div className="recipe-name-cell"><span className="recipe-thumb">{production.recipeName.slice(0, 1).toUpperCase()}</span><div><strong>{production.recipeName}</strong></div></div></td><td>{number(production.quantity)}</td><td>{number(production.produced)} un.</td><td>{money(production.cost)}</td><td className="price-cell">{money(production.salePrice)}</td><td className="price-cell">{money(production.revenue)}</td></tr>)}</tbody></table></div> : <div className="empty-state">Ainda não há produções registradas.</div>}
-            </section>
-            <div className="footnote"><Icon name="check" size={14} /> Alterações em receitas e preços são salvas automaticamente neste dispositivo.</div>
-          </>}
+          {page === 'overview' && <Overview productions={calculated} sales={sales} recipeCount={recipes.length} marketCount={market.length} onViewSales={() => setPage('sales')} onViewProduction={(id) => { setSelectedProductionId(id ?? ''); setPage(id ? 'production-detail' : 'production') }} importAction={<><input ref={fileInput} type="file" accept=".xlsx,.xls,.csv" onChange={importWorkbook} hidden /><button className="button button-secondary" onClick={() => fileInput.current?.click()}><Icon name="upload" size={17} /> Importar planilha</button></>} />}
 
           {(page === 'recipes' || page === 'recipe-detail') && <>
             {page === 'recipe-detail' && <button className="text-button detail-back" onClick={() => setPage('recipes')}><ArrowLeft size={17} aria-hidden="true" /> Voltar para receitas</button>}
@@ -692,6 +680,7 @@ function App() {
                       <div><span>Lucro previsto</span><strong>{money(result.profit)}</strong></div>
                     </div>
                     <SalePriceSimulation result={result} onPriceChange={(expectedSalePrice) => updateProduction(production.id, { expectedSalePrice })} />
+                    <RealizedSales production={result} sales={sales} onViewSales={() => setPage('sales')} />
                   </article>
                 })}
               </section> : !recipes.length ? <section className="panel empty-editor"><span className="empty-illustration"><Icon name="recipe" size={28} /></span><h2>Cadastre uma receita primeiro</h2><p>As fichas técnicas serão selecionadas ao criar cada registro de produção.</p><button className="button button-primary" onClick={() => setPage('recipes')}><Icon name="recipe" size={16} /> Ir para receitas</button></section> : <section className="panel empty-editor"><span className="empty-illustration"><Icon name="chart" size={28} /></span><h2>Nenhuma produção registrada</h2><p>Crie um registro para informar qual receita foi feita, em que quantidade e quais foram os resultados.</p><button className="button button-primary" onClick={addProduction}><Icon name="plus" size={16} /> Registrar primeira produção</button></section>}
