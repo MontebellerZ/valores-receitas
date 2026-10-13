@@ -593,6 +593,13 @@ h1 { font-size: 32px; }
 .production-results span { color: #858e83; font-size: 10px; line-height: 1.3; }
 .production-results strong { color: #426b4b; font-family: Manrope, sans-serif; font-size: 14px; white-space: nowrap; }
 .production-results .production-breakdown { color: #899188; font-size: 9px; font-weight: 400; line-height: 1.3; }
+.sale-simulation { margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--line); }
+.simulation-price-field { max-width: 260px; margin-top: 12px; }
+.simulation-price-field .currency-input { width: 100%; height: 34px; }
+.simulation-results { margin-top: 12px; padding: 0; border: 0; border-radius: 0; background: transparent; }
+.simulation-results strong { white-space: normal; overflow-wrap: anywhere; }
+.simulation-results strong.text-negative { color: #bb6458; }
+.simulation-message { margin-top: 8px; font-size: 11px; line-height: 1.5; }
 @media (max-width: 1160px) {
   .production-fields { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }

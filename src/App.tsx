@@ -32,6 +32,7 @@ type Production = {
   packageQty: number
   yieldPerBatch: number
   ingredientCostPerBatch: number
+  expectedSalePrice?: number
 }
 type Page = 'overview' | 'recipes' | 'production' | 'market'
 type PendingDelete =
@@ -100,6 +101,7 @@ function readSavedData(): { market: MarketItem[]; recipes: Recipe[]; productions
         const productions: Production[] = Array.isArray(parsed.productions) ? parsed.productions.map((production) => ({
           ...production,
           actualYield: Number.isFinite(production.actualYield) ? production.actualYield : (Number(production.yieldPerBatch) || 0) * (Number(production.quantity) || 0),
+          expectedSalePrice: typeof production.expectedSalePrice === 'number' && Number.isFinite(production.expectedSalePrice) && production.expectedSalePrice >= 0 ? production.expectedSalePrice : undefined,
         })) : parsed.recipes.flatMap((oldRecipe) => {
           if (!('quantity' in oldRecipe) || !Number(oldRecipe.quantity)) return []
           const recipe = recipes.find((entry) => entry.id === oldRecipe.id)
@@ -268,6 +270,53 @@ function SearchableMarketSelect({
       </button>) : <div className="market-select-empty">Nenhum item encontrado.</div>}
     </div>, document.body)}
   </div>
+}
+
+function SalePriceSimulation({ result, onPriceChange }: { result: CalculatedProduction; onPriceChange: (price: number | undefined) => void }) {
+  const inputId = useId()
+  const [priceDraft, setPriceDraft] = useState(() => result.expectedSalePrice === undefined ? '' : String(result.expectedSalePrice).replace('.', ','))
+  const price = asNumber(priceDraft, NaN)
+  const revenue = price * result.packages
+  const validPrice = priceDraft.trim() !== '' && Number.isFinite(price) && price >= 0 && Number.isFinite(revenue)
+  const balance = revenue - result.cost
+  const profit = Math.abs(balance) <= Number.EPSILON * Math.max(1, Math.abs(revenue), Math.abs(result.cost)) ? 0 : balance
+  const hasResults = validPrice && result.packages > 0
+  const invalidPrice = priceDraft.trim() !== '' && !validPrice
+  const roundUp = (value: number) => Math.ceil(value - Number.EPSILON * Math.max(1, Math.abs(value)))
+  const breakEvenPackages = result.cost === 0 ? 0 : price > 0 ? roundUp(result.cost / price) : Infinity
+
+  return <section className="sale-simulation" aria-labelledby={`${inputId}-title`}>
+    <div className="panel-heading"><h2 id={`${inputId}-title`}>Venda esperada</h2></div>
+    <label className="field simulation-price-field" htmlFor={inputId}>
+      <span>Preço de venda desejado / pacote</span>
+      <div className="currency-input"><span>R$</span><input id={inputId} type="text" inputMode="decimal" placeholder={moneyInputValue(result.salePrice)} value={priceDraft} aria-invalid={invalidPrice} aria-describedby={invalidPrice ? `${inputId}-error` : undefined} onChange={(event) => {
+        const draft = event.target.value
+        setPriceDraft(draft)
+        if (!draft.trim()) {
+          onPriceChange(undefined)
+          return
+        }
+        const nextPrice = asNumber(draft, NaN)
+        if (Number.isFinite(nextPrice) && nextPrice >= 0 && Number.isFinite(nextPrice * result.packages)) onPriceChange(nextPrice)
+      }} /></div>
+    </label>
+    {invalidPrice && <p className="simulation-message text-negative" id={`${inputId}-error`}>Informe um preço válido maior ou igual a zero.</p>}
+    {validPrice && result.packages === 0 && <p className="simulation-message">Sem pacotes disponíveis para venda.</p>}
+    <div className="production-results simulation-results" aria-live="polite">
+      <div><span>Custo / pacote</span><strong>{result.packages > 0 ? money(result.costPerPackage) : '—'}</strong></div>
+      <div><span>Faturamento esperado</span><strong>{hasResults ? money(revenue) : '—'}</strong></div>
+      <div><span>Lucro esperado</span><strong className={hasResults && profit < 0 ? 'text-negative' : undefined}>{hasResults ? money(profit) : '—'}</strong></div>
+      <div><span>Lucro / pacote</span><strong className={hasResults && profit < 0 ? 'text-negative' : undefined}>{hasResults ? money(profit / result.packages) : '—'}</strong></div>
+      <div><span>Acréscimo sobre custo</span><strong>{hasResults && result.cost > 0 ? `${number(profit / result.cost * 100, 1)}%` : '—'}</strong></div>
+      <div><span>Margem sobre venda</span><strong>{hasResults && revenue > 0 ? `${number(profit / revenue * 100, 1)}%` : '—'}</strong></div>
+      <div><span>Pacotes para cobrir o custo</span><strong>{hasResults ? Number.isFinite(breakEvenPackages) ? `${number(breakEvenPackages)} pacotes` : 'Inviável a este preço' : '—'}</strong></div>
+    </div>
+    {hasResults && profit <= 0 && <p className={`simulation-message ${profit < 0 ? 'text-negative' : 'text-positive'}`} role="status">
+      {profit < 0
+        ? `Mesmo vendendo todos os pacotes, faltariam ${money(-profit)} para cobrir o custo registrado.`
+        : 'A venda de todos os pacotes cobre exatamente o custo registrado, sem lucro.'}
+    </p>}
+  </section>
 }
 
 function App() {
@@ -568,6 +617,7 @@ function App() {
                       <div><span>Faturamento previsto</span><strong>{money(result.revenue)}</strong></div>
                       <div><span>Lucro previsto</span><strong>{money(result.profit)}</strong></div>
                     </div>
+                    <SalePriceSimulation result={result} onPriceChange={(expectedSalePrice) => updateProduction(production.id, { expectedSalePrice })} />
                   </article>
                 })}
               </section> : <section className="panel empty-editor"><span className="empty-illustration"><Icon name="chart" size={28} /></span><h2>Nenhuma produção registrada</h2><p>Crie um registro para informar qual receita foi feita, em que quantidade e quais foram os resultados.</p><button className="button button-primary" onClick={addProduction}><Icon name="plus" size={16} /> Registrar primeira produção</button></section>}
