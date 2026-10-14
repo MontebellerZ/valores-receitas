@@ -4,6 +4,8 @@ import { ArrowLeft, Eye, ShoppingBag } from 'lucide-react'
 import * as XLSX from 'xlsx'
 import Sales, { type Sale, type SaleDraft } from './Sales'
 import Overview from './Overview'
+import logoHorizontal from './assets/brand/conta-de-chef-horizontal.png'
+import logoSymbol from './assets/brand/conta-de-chef-symbol.png'
 import './App.css'
 
 type MarketItem = {
@@ -577,8 +579,8 @@ function App() {
     <div className="app-shell">
       <aside className="sidebar">
         <a className="brand" href="#inicio" onClick={() => setPage('overview')} aria-label="Conta de Chef, início">
-          <img className="brand-logo-horizontal" src="/brand/conta-de-chef-horizontal.png" alt="" width="624" height="194" />
-          <img className="brand-logo-symbol" src="/brand/conta-de-chef-symbol.png" alt="" width="462" height="478" />
+          <img className="brand-logo-horizontal" src={logoHorizontal} alt="" width="624" height="194" />
+          <img className="brand-logo-symbol" src={logoSymbol} alt="" width="462" height="478" />
         </a>
         <div className="workspace-label">ESPAÇO DE TRABALHO</div>
         <nav className="main-nav" aria-label="Navegação principal">

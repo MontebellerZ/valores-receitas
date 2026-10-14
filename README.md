@@ -1,6 +1,6 @@
 # Conta de Chef
 
-<img src="public/brand/conta-de-chef-horizontal.png" alt="Conta de Chef" width="360" />
+<img src="src/assets/brand/conta-de-chef-horizontal.png" alt="Conta de Chef" width="360" />
 
 Aplicação web para acompanhar receitas culinárias, custos de ingredientes, produções e vendas. Feita para pequenos negócios de culinária e confeitaria que precisam entender quanto custa produzir, planejar preços e acompanhar os resultados reais das vendas.
 
