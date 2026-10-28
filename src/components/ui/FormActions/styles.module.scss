@@ -1,0 +1,13 @@
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 9px;
+  margin-top: 22px;
+}
+
+.actions > button {
+  min-height: 40px;
+  padding: 0 15px;
+  border-radius: 9px;
+}

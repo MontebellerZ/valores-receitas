@@ -1,0 +1,27 @@
+.field {
+  min-width: 0;
+  display: grid;
+  gap: 6px;
+  color: #81887f;
+  font-size: 11px;
+}
+
+.registration {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.registration > span:first-child {
+  color: #5d675e;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.inline {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+  color: var(--ink);
+}

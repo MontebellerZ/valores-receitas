@@ -1,0 +1,14 @@
+@use "../../../styles/shared";
+
+@include shared.icon-buttons;
+
+.view-item {
+  width: 36px;
+  height: 36px;
+  color: var(--green);
+}
+
+.view-item:hover {
+  background: #edf3ee;
+  border-color: #b9c9bb;
+}

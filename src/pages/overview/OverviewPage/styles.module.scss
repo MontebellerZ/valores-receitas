@@ -1,0 +1,189 @@
+@use "../../../styles/shared";
+
+@include shared.page-actions;
+
+@include shared.feedback;
+
+.round-icon {
+  display: grid;
+  place-items: center;
+  width: 29px;
+  height: 29px;
+  border-radius: 8px;
+  background: #eff4ef;
+  color: #608168;
+}
+
+.overview-period-filter {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 20px;
+}
+
+.period-select {
+  width: 180px;
+}
+
+.overview-period-filter > span {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.overview-summary-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr);
+  gap: 30px;
+}
+
+.overview-section {
+  border-bottom: 1px solid var(--line);
+}
+
+.overview-empty-brand img {
+  display: block;
+  width: 180px;
+  max-width: 100%;
+  height: auto;
+  margin: 0 auto 18px;
+}
+
+.overview-production-progress {
+  display: grid;
+  gap: 18px;
+}
+
+.overview-progress-heading,
+.overview-progress-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.overview-progress-heading > div {
+  min-width: 0;
+}
+
+.overview-progress-heading strong {
+  display: block;
+  color: var(--ink);
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+
+.overview-progress-heading small {
+  display: block;
+  margin-top: 3px;
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.overview-progress-heading > span {
+  flex: 0 0 auto;
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.overview-dashboard progress {
+  display: block;
+  width: 100%;
+  height: 7px;
+  margin: 8px 0;
+  overflow: hidden;
+  border: 0;
+  border-radius: 4px;
+  background: #e8ece7;
+  accent-color: var(--green);
+}
+
+.overview-dashboard progress::-webkit-progress-bar {
+  background: #e8ece7;
+}
+
+.overview-dashboard progress::-webkit-progress-value {
+  background: var(--green);
+}
+
+.overview-dashboard progress::-moz-progress-bar {
+  background: var(--green);
+}
+
+.overview-progress-footer {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.overview-planning-values {
+  display: grid;
+  gap: 18px;
+  margin: 0;
+}
+
+.overview-planning-values > div,
+.overview-reference dl > div {
+  display: grid;
+  gap: 5px;
+}
+
+.overview-planning-values dt,
+.overview-reference dt {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.overview-planning-values dd {
+  margin: 0;
+  color: var(--green-dark);
+  font-family: Manrope, sans-serif;
+  font-size: 20px;
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+
+.overview-planning-values dd.text-negative {
+  color: #bb6458;
+}
+
+.overview-stock-progress {
+  margin-top: 20px;
+}
+
+.overview-stock-progress > span {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.overview-reference {
+  margin-top: 20px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+}
+
+.overview-reference summary {
+  cursor: pointer;
+  font-size: 12px;
+  color: var(--green);
+}
+
+.overview-reference dl {
+  display: grid;
+  gap: 14px;
+  margin: 16px 0 0;
+}
+
+.overview-reference dd {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 920px) {
+  .overview-summary-grid {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0;
+  }
+}

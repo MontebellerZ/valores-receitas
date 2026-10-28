@@ -1,0 +1,46 @@
+@use "../../../styles/shared";
+
+@include shared.table-annotations;
+
+.sales-section {
+  border-top: 1px solid var(--line);
+}
+
+.sales-filters {
+  display: flex;
+  gap: 10px;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.production-filter {
+  width: 240px;
+  max-width: 240px;
+}
+
+.sales-search {
+  width: 170px;
+}
+
+.sales-row-actions {
+  display: flex;
+  gap: 7px;
+}
+
+.sales-row-actions > button {
+  width: 34px;
+  height: 34px;
+  flex: 0 0 auto;
+}
+
+@media (max-width: 680px) {
+  .sales-filters {
+    width: 100%;
+    flex-direction: column;
+  }
+  .sales-search,
+  .production-filter {
+    width: 100%;
+    max-width: 100%;
+  }
+}

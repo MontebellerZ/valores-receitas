@@ -1,0 +1,11 @@
+@use "../../../styles/shared";
+
+@include shared.table-annotations;
+
+.realized-sales-history {
+  margin-top: 16px;
+}
+
+.realized-sales-history td:first-child {
+  min-width: 110px;
+}

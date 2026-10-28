@@ -1,0 +1,23 @@
+.unsaved-bar {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 16px;
+  padding: 10px 14px;
+  border: 1px solid #ecd9a8;
+  border-radius: 10px;
+  background: #fff8e6;
+  color: #6b5316;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.unsaved-actions {
+  display: flex;
+  gap: 9px;
+}

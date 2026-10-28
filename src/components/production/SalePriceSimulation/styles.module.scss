@@ -1,0 +1,14 @@
+@use "../../../styles/shared";
+
+@include shared.feedback;
+
+.simulation-price-field {
+  max-width: 260px;
+  margin-top: 12px;
+}
+
+.simulation-message {
+  margin-top: 8px;
+  font-size: 11px;
+  line-height: 1.5;
+}

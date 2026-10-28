@@ -1,0 +1,12 @@
+.sales-payment {
+  white-space: nowrap;
+  color: #946521;
+}
+
+.sales-payment.is-paid {
+  color: var(--green);
+}
+
+.sales-payment.is-donated {
+  color: var(--muted);
+}

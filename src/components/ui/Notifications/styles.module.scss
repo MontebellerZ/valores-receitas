@@ -1,0 +1,19 @@
+.container {
+  :global(.Toastify__toast) {
+    border-radius: 7px;
+    font-family: "DM Sans", sans-serif;
+    font-size: 12px;
+  }
+  :global(.Toastify__toast--success) {
+    border-left: 4px solid #436958;
+  }
+  :global(.Toastify__toast--error) {
+    border-left: 4px solid #bb6458;
+  }
+  :global(.Toastify__toast--warning) {
+    border-left: 4px solid #d49b34;
+  }
+  :global(.Toastify__toast--info) {
+    border-left: 4px solid #5d8294;
+  }
+}

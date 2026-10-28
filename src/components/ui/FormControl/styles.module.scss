@@ -1,0 +1,107 @@
+.frame {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-width: 0;
+  min-height: 37px;
+  padding: 0 10px;
+  border: 1px solid #dce3da;
+  border-radius: 7px;
+  background: #fff;
+  color: #343b34;
+  font-size: 12px;
+  font-weight: 400;
+  transition: border-color 0.15s, box-shadow 0.15s, background 0.15s;
+
+  &:hover {
+    border-color: #b7c7b7;
+    background: #fdfefd;
+  }
+
+  &:focus-within,
+  &:has([aria-expanded="true"]) {
+    border-color: #668a6d;
+    background: #fff;
+    box-shadow: 0 0 0 3px #e9f0e9;
+  }
+
+  &:has(:disabled) {
+    background: #f4f6f4;
+    color: #69766d;
+    cursor: not-allowed;
+  }
+
+  &:has([aria-invalid="true"]) {
+    border-color: #bb6458;
+  }
+}
+
+.control {
+  width: 100%;
+  min-width: 0;
+  min-height: 35px;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  outline: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  letter-spacing: inherit;
+  text-transform: none;
+
+  &:focus-visible {
+    outline: 0;
+  }
+
+  &::placeholder {
+    color: #a0a79e;
+    font-weight: 400;
+  }
+
+  &:disabled {
+    opacity: 1;
+    cursor: not-allowed;
+  }
+}
+
+.compact {
+  min-height: 34px;
+
+  .control {
+    min-height: 32px;
+  }
+}
+
+.large {
+  min-height: 45px;
+  font-size: 13px;
+
+  .control {
+    min-height: 43px;
+  }
+}
+
+.multiline {
+  align-items: flex-start;
+  padding-block: 8px;
+
+  .control {
+    resize: vertical;
+  }
+}
+
+.adornment,
+.suffix {
+  display: inline-flex;
+  align-items: center;
+  flex: 0 0 auto;
+  color: #8b958b;
+}
+
+.suffix {
+  color: #a0a59d;
+  font-size: 10px;
+  white-space: nowrap;
+}

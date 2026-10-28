@@ -1,0 +1,26 @@
+@use "../../../styles/shared";
+
+@include shared.feedback;
+
+.search-box {
+  width: 180px;
+  max-width: 100%;
+}
+
+.market-table th {
+  padding: 0 12px;
+}
+
+.market-table td {
+  height: 60px;
+  padding: 8px 12px;
+}
+
+@media (max-width: 680px) {
+  .search-box {
+    width: 100%;
+  }
+  .market-table {
+    min-width: 760px;
+  }
+}

@@ -1,0 +1,76 @@
+.market-select {
+  display: block;
+  position: relative;
+  width: 100%;
+  min-width: 0;
+  color: #566056;
+  font-size: 11px;
+  letter-spacing: normal;
+  text-transform: none;
+}
+
+.market-select-caret {
+  width: 0;
+  height: 0;
+  flex: 0 0 auto;
+  border-top: 4px solid #90998f;
+  border-right: 4px solid transparent;
+  border-left: 4px solid transparent;
+}
+
+.market-select-options {
+  position: fixed;
+  z-index: 1000;
+  max-height: 220px;
+  overflow-y: auto;
+  padding: 4px;
+  border: 1px solid #e5e9e3;
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: 0 12px 28px rgba(35, 48, 36, 0.14);
+}
+
+.market-select-option {
+  width: 100%;
+  min-height: 34px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 7px 9px;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: #596259;
+  font-size: 11px;
+  text-align: left;
+  letter-spacing: normal;
+  text-transform: none;
+}
+
+.market-select-option:hover,
+.market-select-option.active {
+  background: #f2f6f2;
+  color: #3e6747;
+}
+
+.market-select-option:disabled {
+  color: #899188;
+  background: transparent;
+  cursor: not-allowed;
+}
+
+.market-select-option.selected {
+  color: #426b4b;
+  font-weight: 700;
+}
+
+.market-select-option svg {
+  flex: 0 0 auto;
+}
+
+.market-select-empty {
+  padding: 12px 9px;
+  color: #899188;
+  font-size: 10px;
+}

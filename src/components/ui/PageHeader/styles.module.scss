@@ -1,0 +1,92 @@
+.title {
+  color: #2a312a;
+  font-family: Manrope, "DM Sans", sans-serif;
+  font-size: 28px;
+  font-weight: 700;
+  letter-spacing: -1.05px;
+  line-height: 1.2;
+}
+
+@media (max-width: 680px) {
+  .title {
+    font-size: 25px;
+  }
+}
+
+.title {
+  font-size: 32px;
+}
+
+@media (max-width: 680px) {
+  .title {
+    font-size: 28px;
+  }
+}
+
+.welcome-row {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 22px;
+  margin-bottom: 25px;
+}
+
+.eyebrow {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-bottom: 10px;
+  color: #78917e;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 1.15px;
+}
+
+.welcome-row p {
+  margin-top: 7px;
+  color: #899088;
+  font-size: 12px;
+}
+
+.page-title-row {
+  align-items: flex-end;
+  margin-bottom: 22px;
+}
+
+@media (max-width: 680px) {
+  .page-title-row > button,
+  .page-title-row > a {
+    align-self: flex-start;
+  }
+}
+
+@media (max-width: 680px) {
+  .welcome-row {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 14px;
+  }
+  .welcome-row p {
+    max-width: 390px;
+    line-height: 1.5;
+  }
+}
+
+.eyebrow {
+  font-size: 10px;
+}
+
+.welcome-row p {
+  font-size: 14px;
+}
+
+.page-title-row h1 {
+  overflow-wrap: anywhere;
+}
+.dot {
+  width: 6px;
+  height: 6px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: #7cad84;
+}

@@ -1,0 +1,30 @@
+@use "../../../styles/shared";
+
+@include shared.fields;
+@include shared.feedback;
+
+.stock-search {
+  width: 240px;
+  max-width: 100%;
+}
+
+.stock-totals {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.stock-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.stock-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
