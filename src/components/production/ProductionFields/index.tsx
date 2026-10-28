@@ -65,11 +65,6 @@ export default function ProductionFields({
       <FormControl required disabled={disabled} type="number" min="0" step="0.01" value={value.margin}
         onChange={(event) => onChange({ margin: Number(event.target.value) })} />
     </FormField>
-    {locked && <FormField variant={variant} label="Pacotes perdidos">
-      <FormControl disabled={disabled} type="number" min="0" step="1" value={value.lostPackages ?? 0}
-        onChange={(event) => onChange({ lostPackages: event.target.value === "" ? 0 : Number(event.target.value) })} />
-      <small>Pacotes prontos que venceram, foram roubados ou descartados. Não ficam disponíveis para venda.</small>
-    </FormField>}
     {value.isStandalone && <FormField variant={variant} label="Custo total da produção (R$)">
       <FormControl required disabled={disabled} type="number" min="0" step="0.01" value={value.totalCost ?? ""}
         onChange={(event) => onChange({ totalCost: event.target.value === "" ? null : Number(event.target.value) })} />

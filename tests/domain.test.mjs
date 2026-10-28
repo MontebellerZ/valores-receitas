@@ -11,6 +11,7 @@ let overview;
 let storage;
 let workbookService;
 let navigation;
+let productionReport;
 
 const item = {
   id: "market-test",
@@ -65,6 +66,7 @@ before(async () => {
   storage = await server.ssrLoadModule("/src/services/storage.ts");
   workbookService = await server.ssrLoadModule("/src/services/workbook.ts");
   navigation = await server.ssrLoadModule("/src/app/paths.ts");
+  productionReport = await server.ssrLoadModule("/src/domain/productionReport.ts");
 });
 
 after(async () => {
@@ -222,6 +224,33 @@ test("lost packages reduce sellable stock and forecast without changing cost per
   for (const lostPackages of [4, -1, 1.5]) {
     assert.ok(rules.validateProductionUpdate(production, { lostPackages }, [sale]));
   }
+});
+
+test("production report summarizes package destinations, yield and financial results", () => {
+  const calculated = calculations.calculateProduction({ ...production, lostPackages: 1 });
+  const base = { productionId: production.id, productionDate: production.date, recipeName: production.recipeName,
+    date: production.date, costPerPackage: calculated.costPerPackage, customer: "", notes: "" };
+  const sales = [
+    { ...base, id: "paid", packages: 2, pricePerPackage: 3, paid: true },
+    { ...base, id: "gift", packages: 1, pricePerPackage: 0, paid: true, donated: true },
+    { ...base, id: "pending", packages: 1, pricePerPackage: 4, paid: false },
+    { ...base, id: "other", productionId: "other", packages: 5, pricePerPackage: 9, paid: true },
+  ];
+  const report = productionReport.buildProductionReport(calculated, sales);
+  assert.equal(report.salesCount, 3);
+  assert.deepEqual([report.soldPackages, report.donatedPackages, report.lostPackages, report.availablePackages], [3, 1, 1, 1]);
+  assert.deepEqual([report.revenue, report.received, report.pending], [10, 6, 4]);
+  assert.equal(report.result, 0);
+  assert.equal(report.costRecovery, 1);
+  assert.equal(report.status, "selling");
+  assert.equal(report.expectedYield, 20);
+  assert.equal(report.lossRate, 0.1);
+  assert.equal(report.averagePrice, 10 / 3);
+  assert.ok(Math.abs(report.giveawayCost - 2 * calculated.costPerPackage) < 1e-9);
+  assert.ok(Math.abs(report.projectedRevenue - 12.5) < 1e-9);
+  assert.ok(Math.abs(report.projectedResult - 2.5) < 1e-9);
+  assert.equal(productionReport.buildProductionReport(calculated, []).status, "waiting");
+  assert.equal(productionReport.buildProductionReport({ ...calculated, lostPackages: 6 }, []).status, "closed");
 });
 
 test("production changes cannot invalidate existing sales", () => {

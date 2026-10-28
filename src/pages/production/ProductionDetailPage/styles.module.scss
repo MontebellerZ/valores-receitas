@@ -1,4 +1,33 @@
-@use "../../../styles/shared";
+﻿@use "../../../styles/shared";
 
 @include shared.fields;
 @include shared.feedback;
+
+.columns {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: stretch;
+  gap: 18px;
+  margin-bottom: 18px;
+}
+
+.section {
+  margin-bottom: 18px;
+
+  > section:first-child {
+    margin-top: 0;
+    padding-top: 0;
+    border-top: 0;
+  }
+}
+
+.section-note {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+@media (max-width: 1080px) {
+  .columns {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

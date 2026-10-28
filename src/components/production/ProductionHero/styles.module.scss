@@ -1,0 +1,180 @@
+.hero {
+  position: relative;
+  overflow: hidden;
+  margin-bottom: 18px;
+  padding: 24px 24px 20px;
+  border-radius: 14px;
+  background: linear-gradient(135deg, #2f4c3c 0%, #436958 62%, #5b7f69 100%);
+  color: #fff;
+  box-shadow: 0 10px 28px rgba(39, 66, 52, 0.18);
+}
+
+.hero::after {
+  content: "";
+  position: absolute;
+  top: -80px;
+  right: -60px;
+  width: 260px;
+  height: 260px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.06);
+  pointer-events: none;
+}
+
+.top {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.identity {
+  min-width: 0;
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+
+  h1 {
+    margin: 2px 0 8px;
+    font-family: Manrope, sans-serif;
+    font-size: 26px;
+    font-weight: 800;
+    letter-spacing: -0.6px;
+    line-height: 1.15;
+    overflow-wrap: anywhere;
+  }
+}
+
+.badge {
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  width: 48px;
+  height: 48px;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  border-radius: 13px;
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.eyebrow {
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+}
+
+.status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 99px;
+  background: rgba(255, 255, 255, 0.16);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.status::before {
+  content: "";
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.status-selling {
+  color: #d9f3df;
+}
+
+.status-waiting {
+  color: #ffe6b3;
+}
+
+.status-closed {
+  color: #ffffff;
+}
+
+.status-empty {
+  color: #ffd2c9;
+}
+
+.actions {
+  display: flex;
+  gap: 8px;
+}
+
+.kpis {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  margin: 22px 0 0;
+
+  > div {
+    min-width: 0;
+    padding: 13px 14px;
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.1);
+    backdrop-filter: blur(2px);
+  }
+
+  dt {
+    color: rgba(255, 255, 255, 0.75);
+    font-size: 12px;
+  }
+
+  dd {
+    margin: 6px 0 4px;
+    font-family: Manrope, sans-serif;
+    font-size: 22px;
+    font-weight: 800;
+    letter-spacing: -0.4px;
+    overflow-wrap: anywhere;
+
+    span {
+      color: rgba(255, 255, 255, 0.65);
+      font-size: 15px;
+      font-weight: 600;
+    }
+  }
+
+  small {
+    display: block;
+    color: rgba(255, 255, 255, 0.7);
+    font-size: 11px;
+  }
+}
+
+.positive {
+  color: #e6f8e9;
+}
+
+.negative {
+  color: #ffc9bd;
+}
+
+@media (max-width: 920px) {
+  .kpis {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 480px) {
+  .hero {
+    padding: 18px 16px 16px;
+  }
+  .identity h1 {
+    font-size: 21px;
+  }
+  .badge {
+    display: none;
+  }
+  .kpis dd {
+    font-size: 18px;
+  }
+}

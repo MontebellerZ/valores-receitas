@@ -1,0 +1,147 @@
+.recovery {
+  padding: 14px;
+  border: 1px solid #e8eee7;
+  border-radius: 10px;
+  background: #f8faf7;
+
+  p {
+    margin-top: 10px;
+    font-size: 12px;
+    font-weight: 600;
+  }
+}
+
+.recovery-heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 8px;
+
+  span {
+    color: #5f685f;
+    font-size: 13px;
+  }
+
+  strong {
+    color: var(--green-dark);
+    font-family: Manrope, sans-serif;
+    font-size: 22px;
+    font-weight: 800;
+  }
+}
+
+.track {
+  height: 12px;
+  overflow: hidden;
+  border-radius: 99px;
+  background: #e6ebe4;
+
+  > span {
+    display: block;
+    height: 100%;
+    border-radius: inherit;
+    background: linear-gradient(90deg, #d9a556, #7fa088);
+    transition: width 0.25s ease;
+  }
+
+  > span.covered {
+    background: linear-gradient(90deg, #5b8a6a, #345442);
+  }
+}
+
+.recovery-legend {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 6px;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.warning {
+  color: #a7743a;
+}
+
+.success {
+  color: #4f7b62;
+}
+
+.values {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0 18px;
+  margin: 12px 0 0;
+
+  > div {
+    min-width: 0;
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 10px 0;
+    border-bottom: 1px solid var(--line);
+  }
+
+  dt {
+    color: #737b72;
+    font-size: 12px;
+  }
+
+  dd {
+    margin: 0;
+    color: var(--ink);
+    font-size: 14px;
+    font-weight: 700;
+    text-align: right;
+    white-space: nowrap;
+  }
+}
+
+.pending {
+  color: #a7743a !important;
+}
+
+.negative {
+  color: #bb6458 !important;
+}
+
+.projection {
+  margin-top: 14px;
+  padding: 13px 14px;
+  border-radius: 10px;
+  background: #eef4ef;
+
+  > div {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+    margin-top: 8px;
+  }
+
+  small {
+    display: block;
+    color: #6f786f;
+    font-size: 11px;
+  }
+
+  strong {
+    color: var(--green-dark);
+    font-family: Manrope, sans-serif;
+    font-size: 18px;
+    font-weight: 800;
+    overflow-wrap: anywhere;
+  }
+}
+
+.projection-title {
+  color: #4f5a50;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+@media (max-width: 480px) {
+  .values {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

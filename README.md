@@ -58,12 +58,18 @@ Cadastro apenas de nome e unidade, sem dados de embalagem ou preços. Um mesmo i
 - Relação dos lotes consumidos na tela de detalhes, inclusive quando já estão inativos.
 - Estoque insuficiente recusa a produção inteira, sem baixas parciais.
 - Receita e quantidade ficam imutáveis após salvar; o custo não é recalculado por compras futuras ou alterações na ficha.
-- **Pacotes perdidos:** nos detalhes de uma produção salva, informe quantos pacotes prontos foram perdidos depois da produção (vencimento, roubo ou descarte). Eles saem do saldo disponível para venda e do faturamento esperado, mas o custo por pacote não muda. Não é possível marcar como perdidos mais pacotes do que os que ainda não foram vendidos. A tela de vendas mostra os perdidos no saldo por produção.
+- **Pacotes perdidos:** no cartão **Destino dos pacotes** de uma produção salva, informe quantos pacotes prontos foram perdidos depois da produção (vencimento, roubo ou descarte). Eles saem do saldo disponível para venda e do faturamento esperado, mas o custo por pacote não muda. Não é possível marcar como perdidos mais pacotes do que os que ainda não foram vendidos. A tela de vendas mostra os perdidos no saldo por produção.
 - **Produção avulsa:** a seta à direita do botão **Registrar produção** abre as opções *Registrar produção* (fluxo normal) e *Registrar produção avulsa*. A avulsa serve para produções feitas antes de usar o site: não consome nem exige estoque e a ficha não precisa de insumos. O custo total é informado manualmente e pode ser corrigido no detalhe; a lista a identifica como "(avulsa)".
 - Preço sugerido a partir do lucro desejado sobre o custo.
 - **Venda esperada:** preço desejado por pacote, faturamento, resultado, margens e pacotes necessários para cobrir o custo. O preço informado é salvo por produção.
 - **Venda realizada:** pacotes vendidos e disponíveis, faturamento, recebimentos, resultado e histórico cronológico com faturamento acumulado.
 - Listagem resumida e tela separada de visualização e edição.
+- **Detalhes da produção** organizados como um painel:
+  - **Cabeçalho** com receita, data, situação (*Aguardando vendas*, *Em venda*, *Encerrada* ou *Sem pacotes*) e os indicadores principais: custo, pacotes saídos, faturamento e resultado atual.
+  - **Destino dos pacotes:** barra com vendidos, doados, perdidos e disponíveis, além do campo de pacotes perdidos.
+  - **Resultado financeiro:** percentual do custo recuperado, recebido e a receber, preço médio, margem, custo de doações e perdas e a projeção ao vender os pacotes restantes.
+  - **Rendimento da produção:** rendimento esperado, obtido, perdas e líquido, além de pacotes formados, custo por unidade e preço sugerido.
+  - **Dados da produção:** campos editáveis, salvos automaticamente; seguidos de venda esperada, venda realizada e lotes consumidos.
 
 ### Vendas
 
