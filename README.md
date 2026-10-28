@@ -67,8 +67,8 @@ Cadastro apenas de nome e unidade, sem dados de embalagem ou preços. Um mesmo i
 - **Detalhes da produção** organizados como um painel:
   - **Cabeçalho** com receita, data, situação (*Aguardando vendas*, *Em venda*, *Encerrada* ou *Sem pacotes*) e os indicadores principais: custo, pacotes saídos, faturamento e resultado atual.
   - **Destino dos pacotes:** barra com vendidos, doados, perdidos e disponíveis, além do campo de pacotes perdidos.
-  - **Resultado financeiro:** percentual do custo recuperado, recebido e a receber, preço médio, margem, custo de doações e perdas e a projeção ao vender os pacotes restantes.
-  - **Rendimento da produção:** rendimento esperado, obtido, perdas e líquido, além de pacotes formados, custo por unidade e preço sugerido.
+  - **Resultado financeiro:** percentual do custo recuperado (investido × faturado), recebido e a receber, preço médio, margem, custo de doações e perdas, faturamento deixado de ganhar com doações e perdas (pelo preço de venda desejado), comparação real × esperado de faturamento e lucro (todos os pacotes formados ao preço desejado) e a projeção ao vender os pacotes restantes.
+  - **Rendimento da produção:** rendimento esperado, obtido, perdas e líquido, além de pacotes formados, custo por pacote e preço sugerido.
   - **Dados da produção:** campos editáveis, salvos automaticamente; seguidos de venda esperada, venda realizada e lotes consumidos.
 
 ### Vendas

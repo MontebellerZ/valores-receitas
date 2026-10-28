@@ -21,6 +21,8 @@ export function buildProductionReport(production: CalculatedProduction, sales: S
   const result = balance(totals.revenue, production.cost);
   const projectedRevenue = totals.revenue + availablePackages * price;
   const projectedResult = balance(projectedRevenue, production.cost);
+  const expectedRevenue = production.packages * price;
+  const expectedProfit = balance(expectedRevenue, production.cost);
   const status: ProductionStatus =
     production.packages === 0 ? "no-packages"
       : availablePackages === 0 ? "closed"
@@ -33,8 +35,8 @@ export function buildProductionReport(production: CalculatedProduction, sales: S
     received: totals.received,
     pending: totals.pending,
     soldCost: totals.cost,
-    salesResult: balance(totals.revenue, totals.cost),
     giveawayCost: (donatedPackages + lostPackages) * production.costPerPackage,
+    missedRevenue: (donatedPackages + lostPackages) * price,
     soldPackages,
     donatedPackages,
     lostPackages,
@@ -45,12 +47,15 @@ export function buildProductionReport(production: CalculatedProduction, sales: S
     yieldEfficiency: ratio(production.actualYield, expectedYield),
     lossRate: ratio(production.losses, production.actualYield),
     leftoverUnits,
-    costPerUnit: production.produced > 0 ? production.cost / production.produced : 0,
     averagePrice: soldPackages > 0 ? totals.revenue / soldPackages : 0,
     costRecovery: ratio(totals.revenue, production.cost),
     result,
     margin: ratio(result, totals.revenue),
     price,
+    expectedRevenue,
+    expectedProfit,
+    revenueGap: balance(totals.revenue, expectedRevenue),
+    profitGap: balance(result, expectedProfit),
     projectedRevenue,
     projectedResult,
     status,

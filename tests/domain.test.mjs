@@ -249,6 +249,10 @@ test("production report summarizes package destinations, yield and financial res
   assert.ok(Math.abs(report.giveawayCost - 2 * calculated.costPerPackage) < 1e-9);
   assert.ok(Math.abs(report.projectedRevenue - 12.5) < 1e-9);
   assert.ok(Math.abs(report.projectedResult - 2.5) < 1e-9);
+  assert.ok(Math.abs(report.missedRevenue - 2 * calculated.salePrice) < 1e-9);
+  assert.ok(Math.abs(report.expectedRevenue - 6 * calculated.salePrice) < 1e-9);
+  assert.ok(Math.abs(report.revenueGap - (10 - 6 * calculated.salePrice)) < 1e-9);
+  assert.ok(Math.abs(report.profitGap - (0 - report.expectedProfit)) < 1e-9);
   assert.equal(productionReport.buildProductionReport(calculated, []).status, "waiting");
   assert.equal(productionReport.buildProductionReport({ ...calculated, lostPackages: 6 }, []).status, "closed");
 });

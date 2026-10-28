@@ -44,9 +44,9 @@ export default function ProductionYield({ production, report }: {
         <small>{number(production.packageQty, 4)} un. por pacote</small>
       </div>
       <div>
-        <span>Custo / unidade</span>
-        <strong>{production.produced > 0 ? money(report.costPerUnit) : "—"}</strong>
-        <small>Sobre o rendimento líquido</small>
+        <span>Custo / pacote</span>
+        <strong>{production.packages > 0 ? money(production.costPerPackage) : "—"}</strong>
+        <small>Custo total dividido pelos pacotes formados</small>
       </div>
       <div>
         <span>Preço sugerido / pacote</span>
