@@ -59,6 +59,10 @@ export function readSavedData(key = STORAGE_KEY): {
           category: recipe.category ?? "",
           yield: Number(recipe.yield) || 0,
           hoursPerBatch: Number(recipe.hoursPerBatch) || 0,
+          shelfLifeDays:
+            Number.isInteger(recipe.shelfLifeDays) && recipe.shelfLifeDays! >= 0
+              ? recipe.shelfLifeDays
+              : null,
           ingredients: Array.isArray(recipe.ingredients)
             ? recipe.ingredients
             : [],

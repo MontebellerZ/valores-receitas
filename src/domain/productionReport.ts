@@ -6,6 +6,62 @@ export type ProductionStatus = "no-packages" | "waiting" | "selling" | "closed";
 
 const ratio = (part: number, total: number) => (total > 0 ? part / total : 0);
 
+const MAX_CONTINUOUS_DAYS = 62;
+
+const toUtc = (iso: string) => {
+  const [year, month, day] = iso.split("-").map(Number);
+  return Date.UTC(year, month - 1, day);
+};
+const fromUtc = (time: number) => new Date(time).toISOString().slice(0, 10);
+const DAY = 86_400_000;
+
+/** Data de vencimento (ISO) a partir da data de produção e da validade em dias. */
+export function expirationDate(date: string, shelfLifeDays?: number | null) {
+  if (!date || shelfLifeDays == null || !Number.isFinite(shelfLifeDays) || shelfLifeDays < 0) return null;
+  return fromUtc(toUtc(date) + Math.round(shelfLifeDays) * DAY);
+}
+
+export type ProductionDay = {
+  date: string;
+  sold: number;
+  donated: number;
+  total: number;
+  revenue: number;
+  /** Resultado acumulado ao fim do dia: faturamento acumulado menos o custo da produção. */
+  result: number;
+};
+
+/**
+ * Saídas e resultado por dia, da data de produção até a última venda. Períodos longos
+ * mantêm apenas os dias com movimento para que os gráficos continuem legíveis.
+ */
+export function buildDailyTimeline(production: CalculatedProduction, linkedSales: Sale[]): ProductionDay[] {
+  const byDate = new Map<string, Omit<ProductionDay, "date" | "result">>();
+  for (const sale of linkedSales) {
+    if (!sale.date) continue;
+    const entry = byDate.get(sale.date) ?? { sold: 0, donated: 0, total: 0, revenue: 0 };
+    if (sale.donated) entry.donated += sale.packages;
+    else entry.sold += sale.packages;
+    entry.total += sale.packages;
+    entry.revenue += sale.packages * sale.pricePerPackage;
+    byDate.set(sale.date, entry);
+  }
+  const saleDates = [...byDate.keys()].sort();
+  if (!saleDates.length) return [];
+  const first = production.date && production.date < saleDates[0] ? production.date : saleDates[0];
+  const last = saleDates[saleDates.length - 1];
+  const span = Math.round((toUtc(last) - toUtc(first)) / DAY) + 1;
+  const dates = span <= MAX_CONTINUOUS_DAYS
+    ? Array.from({ length: span }, (_, index) => fromUtc(toUtc(first) + index * DAY))
+    : [...new Set([first, ...saleDates])];
+  let revenue = 0;
+  return dates.map((date) => {
+    const entry = byDate.get(date) ?? { sold: 0, donated: 0, total: 0, revenue: 0 };
+    revenue += entry.revenue;
+    return { date, ...entry, result: balance(revenue, production.cost) };
+  });
+}
+
 export function buildProductionReport(production: CalculatedProduction, sales: Sale[]) {
   const linkedSales = sales.filter((sale) => sale.productionId === production.id);
   const totals = summarizeSales(linkedSales);
@@ -59,6 +115,7 @@ export function buildProductionReport(production: CalculatedProduction, sales: S
     projectedRevenue,
     projectedResult,
     status,
+    daily: buildDailyTimeline(production, linkedSales),
   };
 }
 

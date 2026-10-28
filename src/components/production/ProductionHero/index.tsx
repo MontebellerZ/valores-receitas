@@ -12,9 +12,11 @@ const statuses: Record<ProductionStatus, { label: string; className: string }> =
   closed: { label: "Encerrada", className: styles["status-closed"] },
 };
 
-export default function ProductionHero({ production, report, actions }: {
+export default function ProductionHero({ production, report, expiresOn, actions }: {
   production: CalculatedProduction;
   report: ProductionReport;
+  /** Data de vencimento (ISO) calculada pela validade da receita; apenas informativa. */
+  expiresOn?: string | null;
   actions?: ReactNode;
 }) {
   const status = statuses[report.status];
@@ -27,7 +29,10 @@ export default function ProductionHero({ production, report, actions }: {
             {production.isStandalone ? "Produção avulsa" : "Produção"} · {dateLabel(production.date)}
           </p>
           <h1 id="production-hero-title">{production.recipeName}</h1>
-          <span className={[styles.status, status.className].join(" ")}>{status.label}</span>
+          <div className={styles.tags}>
+            <span className={[styles.status, status.className].join(" ")}>{status.label}</span>
+            {expiresOn && <span className={styles.expiry}>Vence em {dateLabel(expiresOn)}</span>}
+          </div>
         </div>
       </div>
       {actions && <div className={styles.actions}>{actions}</div>}

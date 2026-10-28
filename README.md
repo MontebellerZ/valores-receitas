@@ -45,7 +45,8 @@ Cadastro apenas de nome e unidade, sem dados de embalagem ou preços. Um mesmo i
 
 ### Receitas
 
-- Cadastro de nome, categoria, rendimento por lote e horas de preparo.
+- Cadastro de nome, categoria, rendimento por lote, horas de preparo e validade em dias (opcional).
+- A validade mostra na produção a data de vencimento (data de produção + dias). É apenas informativa: os pacotes não ficam vencidos automaticamente; registre-os em **Pacotes perdidos** quando for o caso.
 - Seleção dos insumos e das quantidades utilizadas por lote.
 - A ficha técnica contém quantidades, não valores. O custo pertence à produção.
 - Listagem resumida com acesso à visualização e edição completa pelo ícone de olho.
@@ -65,9 +66,10 @@ Cadastro apenas de nome e unidade, sem dados de embalagem ou preços. Um mesmo i
 - **Venda realizada:** pacotes vendidos e disponíveis, faturamento, recebimentos, resultado e histórico cronológico com faturamento acumulado.
 - Listagem resumida e tela separada de visualização e edição.
 - **Detalhes da produção** organizados como um painel:
-  - **Cabeçalho** com receita, data, situação (*Aguardando vendas*, *Em venda*, *Encerrada* ou *Sem pacotes*) e os indicadores principais: custo, pacotes saídos, faturamento e resultado atual.
+  - **Cabeçalho** com receita, data, situação (*Aguardando vendas*, *Em venda*, *Encerrada* ou *Sem pacotes*), data de vencimento (quando a receita tem validade) e os indicadores principais: custo, pacotes saídos, faturamento e resultado atual.
   - **Destino dos pacotes:** barra com vendidos, doados, perdidos e disponíveis, além do campo de pacotes perdidos.
-  - **Resultado financeiro:** percentual do custo recuperado (investido × faturado), recebido e a receber, preço médio, margem, custo de doações e perdas, faturamento deixado de ganhar com doações e perdas (pelo preço de venda desejado), comparação real × esperado de faturamento e lucro (todos os pacotes formados ao preço desejado) e a projeção ao vender os pacotes restantes.
+  - **Resultado financeiro:** percentual do custo recuperado (investido × faturado), recebido e a receber, preço médio, margem, custo de doações e perdas, faturamento perdido com doações e perdas (pelo preço de venda desejado), comparação real × esperado de faturamento e lucro (todos os pacotes formados ao preço desejado) e a projeção ao vender os pacotes restantes.
+  - **Evolução das vendas:** gráfico de barras com as saídas de cada dia (vendidos e doados empilhados, com o total diário) e gráfico de linha do resultado acumulado, que começa negativo no custo da produção e sobe conforme o faturamento diário, marcando o dia em que o custo foi recuperado. Os dias vão da data de produção até a última venda; períodos acima de 62 dias mostram apenas os dias com movimento.
   - **Rendimento da produção:** rendimento esperado, obtido, perdas e líquido, além de pacotes formados, custo por pacote e preço sugerido.
   - **Dados da produção:** campos editáveis, salvos automaticamente; seguidos de venda esperada, venda realizada e lotes consumidos.
 
@@ -164,7 +166,7 @@ Exemplos de colunas reconhecidas:
 | Cadastro                | Colunas                                                    |
 | ----------------------- | ---------------------------------------------------------- |
 | Insumos                 | Item, Unidade.                                              |
-| Receita                 | Receita, Categoria, Rendimento, Horas por receita.         |
+| Receita                 | Receita, Categoria, Rendimento, Horas por receita, Validade (dias). |
 | Ingredientes da receita | Receita, Item, Quantidade ingrediente ou Quantidade usada. |
 
 **Importar mescla insumos e receitas por nome normalizado**, preservando os identificadores de itens existentes e os vínculos de estoque. Não remove cadastros ausentes do arquivo. Produções, compras, baixas e vendas não são importadas nem restauradas por esse fluxo.

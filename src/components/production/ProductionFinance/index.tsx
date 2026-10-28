@@ -1,4 +1,4 @@
-import type { CalculatedProduction } from "../../../domain/models";
+﻿import type { CalculatedProduction } from "../../../domain/models";
 import type { ProductionReport } from "../../../domain/productionReport";
 import { money, number } from "../../../utils/format";
 import Panel from "../../ui/Panel";
@@ -40,7 +40,7 @@ export default function ProductionFinance({ production, report }: {
       <div><dt>Margem sobre o faturamento</dt><dd className={negative(report.result)}>{report.revenue > 0 ? `${number(report.margin * 100, 1)}%` : "—"}</dd></div>
       <div><dt>Custo de doações e perdas</dt><dd>{money(report.giveawayCost)}</dd></div>
       <div>
-        <dt title={`Pacotes doados e perdidos multiplicados pelo preço de venda desejado (${money(report.price)})`}>Faturamento deixado de ganhar</dt>
+        <dt title={`Pacotes doados e perdidos multiplicados pelo preço de venda desejado (${money(report.price)})`}>Faturamento perdido</dt>
         <dd className={report.missedRevenue > 0 ? styles.negative : undefined}>{money(report.missedRevenue)}</dd>
       </div>
     </dl>
@@ -48,20 +48,28 @@ export default function ProductionFinance({ production, report }: {
       <span className={styles["projection-title"]}>
         Real × esperado ({number(production.packages)} pacote(s) a {money(report.price)})
       </span>
-      <dl>
-        <div>
-          <dt>Faturamento</dt>
-          <dd><small>Real</small>{money(report.revenue)}</dd>
-          <dd><small>Esperado</small>{money(report.expectedRevenue)}</dd>
-          <dd className={gapClass(report.revenueGap)}><small>Diferença</small>{signed(report.revenueGap)}</dd>
+      <div className={styles["comparison-grid"]} role="table" aria-label="Faturamento e lucro: real, esperado e diferença">
+        <div className={styles["comparison-head"]} role="row">
+          <span role="columnheader" />
+          <span role="columnheader">Faturamento</span>
+          <span role="columnheader">Lucro</span>
         </div>
-        <div>
-          <dt>Lucro</dt>
-          <dd><small>Real</small><span className={negative(report.result)}>{money(report.result)}</span></dd>
-          <dd><small>Esperado</small><span className={negative(report.expectedProfit)}>{money(report.expectedProfit)}</span></dd>
-          <dd className={gapClass(report.profitGap)}><small>Diferença</small>{signed(report.profitGap)}</dd>
+        <div role="row">
+          <span role="rowheader">Real</span>
+          <span role="cell">{money(report.revenue)}</span>
+          <span role="cell" className={negative(report.result)}>{money(report.result)}</span>
         </div>
-      </dl>
+        <div role="row">
+          <span role="rowheader">Esperado</span>
+          <span role="cell">{money(report.expectedRevenue)}</span>
+          <span role="cell" className={negative(report.expectedProfit)}>{money(report.expectedProfit)}</span>
+        </div>
+        <div className={styles["comparison-gap"]} role="row">
+          <span role="rowheader">Diferença</span>
+          <span role="cell" className={gapClass(report.revenueGap)}>{signed(report.revenueGap)}</span>
+          <span role="cell" className={gapClass(report.profitGap)}>{signed(report.profitGap)}</span>
+        </div>
+      </div>
     </div>
     <div className={styles.projection}>
       <span className={styles["projection-title"]}>

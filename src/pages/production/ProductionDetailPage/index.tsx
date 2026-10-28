@@ -20,7 +20,8 @@ import ProductionHero from "../../../components/production/ProductionHero";
 import PackageFlow from "../../../components/production/PackageFlow";
 import ProductionYield from "../../../components/production/ProductionYield";
 import ProductionFinance from "../../../components/production/ProductionFinance";
-import { buildProductionReport } from "../../../domain/productionReport";
+import ProductionCharts from "../../../components/production/ProductionCharts";
+import { buildProductionReport, expirationDate } from "../../../domain/productionReport";
 
 type Props = {
   production: Production;
@@ -73,12 +74,16 @@ export default function ProductionDetailPage({ production, recipes, sales, updat
   </>;
 
   const report = buildProductionReport(result, sales);
+  const shelfLifeDays = recipes.find((recipe) => recipe.id === production.recipeId)?.shelfLifeDays;
   return <>
     <BackButton onClick={onBack}>Voltar para produção</BackButton>
-    <ProductionHero production={result} report={report} actions={deleteButton} />
+    <ProductionHero production={result} report={report} expiresOn={expirationDate(production.date, shelfLifeDays)} actions={deleteButton} />
     <div className={styles.columns}>
       <PackageFlow production={result} report={report} onLostChange={(lostPackages) => update({ lostPackages })} />
       <ProductionFinance production={result} report={report} />
+    </div>
+    <div className={styles.charts}>
+      <ProductionCharts days={report.daily} cost={result.cost} productionDate={production.date} />
     </div>
     <div className={styles.columns}>
       <ProductionYield production={result} report={report} />

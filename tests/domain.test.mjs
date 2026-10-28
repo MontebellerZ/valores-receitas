@@ -257,6 +257,30 @@ test("production report summarizes package destinations, yield and financial res
   assert.equal(productionReport.buildProductionReport({ ...calculated, lostPackages: 6 }, []).status, "closed");
 });
 
+test("production report builds a continuous daily timeline and expiration date", () => {
+  const calculated = calculations.calculateProduction(production);
+  const base = { productionId: production.id, productionDate: production.date, recipeName: production.recipeName,
+    costPerPackage: calculated.costPerPackage, customer: "", notes: "", paid: true };
+  const sales = [
+    { ...base, id: "a", date: "2026-10-18", packages: 2, pricePerPackage: 3 },
+    { ...base, id: "b", date: "2026-10-18", packages: 1, pricePerPackage: 0, donated: true },
+    { ...base, id: "c", date: "2026-10-17", packages: 1, pricePerPackage: 4 },
+  ];
+  const daily = productionReport.buildProductionReport(calculated, sales).daily;
+  assert.deepEqual(daily.map((day) => [day.date, day.sold, day.donated, day.total, day.revenue]), [
+    ["2026-10-16", 0, 0, 0, 0],
+    ["2026-10-17", 1, 0, 1, 4],
+    ["2026-10-18", 2, 1, 3, 6],
+  ]);
+  assert.deepEqual(daily.map((day) => day.result), [-calculated.cost, 4 - calculated.cost, 10 - calculated.cost]);
+  assert.deepEqual(productionReport.buildProductionReport(calculated, []).daily, []);
+  const longGap = productionReport.buildDailyTimeline(calculated, [{ ...sales[0], date: "2027-03-01" }]);
+  assert.deepEqual(longGap.map((day) => day.date), ["2026-10-16", "2027-03-01"]);
+  assert.equal(productionReport.expirationDate("2026-10-16", 20), "2026-11-05");
+  assert.equal(productionReport.expirationDate("2026-10-16", 0), "2026-10-16");
+  assert.equal(productionReport.expirationDate("2026-10-16", null), null);
+});
+
 test("production changes cannot invalidate existing sales", () => {
   const calculated = calculations.calculateProduction(production);
   const sale = rules.prepareSale(draft, [calculated], []).sale;

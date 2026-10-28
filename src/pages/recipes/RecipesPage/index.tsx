@@ -23,11 +23,11 @@ type Props = {
 export default function RecipesPage({ recipes, market, onCreate, onView }: Props) {
   const [isAdding, setIsAdding] = useState(false);
   const [draft, setDraft] = useState<RecipeDraft>({
-    name: "", category: "", yield: 1, hoursPerBatch: 0, ingredients: [],
+    name: "", category: "", yield: 1, hoursPerBatch: 0, shelfLifeDays: null, ingredients: [],
   });
   const startCreating = () => {
     setDraft({
-      name: "", category: "", yield: 1, hoursPerBatch: 0,
+      name: "", category: "", yield: 1, hoursPerBatch: 0, shelfLifeDays: null,
       ingredients: market.length ? [{ marketItemId: market[0].id, quantity: 0 }] : [],
     });
     setIsAdding(true);

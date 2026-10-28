@@ -1,0 +1,159 @@
+.charts {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.chart {
+  min-width: 0;
+  margin: 0;
+  padding: 14px 14px 12px;
+  border: 1px solid #eef0ec;
+  border-radius: 12px;
+  background: #fafbf9;
+
+  figcaption {
+    margin-bottom: 8px;
+
+    h3 {
+      color: var(--ink);
+      font-family: Manrope, sans-serif;
+      font-size: 15px;
+      font-weight: 800;
+    }
+
+    p {
+      margin-top: 2px;
+      color: var(--muted);
+      font-size: 12px;
+    }
+  }
+
+  svg {
+    display: block;
+    width: 100%;
+    height: auto;
+    overflow: visible;
+  }
+}
+
+.grid {
+  stroke: #e9ece7;
+  stroke-width: 1;
+}
+
+.baseline {
+  stroke: #c9cec7;
+  stroke-width: 1.2;
+}
+
+.zero {
+  stroke: #7d857c;
+  stroke-width: 1.2;
+  stroke-dasharray: 5 4;
+}
+
+.axis {
+  fill: #858b85;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.value {
+  fill: #242923;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.marker {
+  fill: #345442;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.sold {
+  fill: #4f7b62;
+}
+
+.donated {
+  fill: #d9a556;
+}
+
+.line {
+  fill: none;
+  stroke-width: 2.6;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+
+.point-positive,
+.point-negative {
+  stroke: #fff;
+  stroke-width: 2;
+}
+
+.point-positive {
+  fill: #3f7a59;
+}
+
+.point-negative {
+  fill: #c46f5f;
+}
+
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 18px;
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+
+  li {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    color: #6f776e;
+    font-size: 12px;
+    font-weight: 600;
+  }
+
+  strong {
+    color: var(--ink);
+    font-family: Manrope, sans-serif;
+    font-size: 14px;
+    font-weight: 800;
+  }
+}
+
+.swatch {
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+}
+
+.swatch-sold {
+  background: #4f7b62;
+}
+
+.swatch-donated {
+  background: #d9a556;
+}
+
+.legend .positive {
+  color: #3f7a59;
+}
+
+.legend .negative {
+  color: #b2533f;
+}
+
+.empty {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+@media (max-width: 1080px) {
+  .charts {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

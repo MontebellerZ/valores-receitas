@@ -4,7 +4,7 @@ import FormControl from "../../ui/FormControl";
 import { FormGrid } from "../../ui/FormLayout";
 import styles from "./styles.module.scss";
 
-type Values = Pick<Recipe, "name" | "category" | "yield" | "hoursPerBatch">;
+type Values = Pick<Recipe, "name" | "category" | "yield" | "hoursPerBatch" | "shelfLifeDays">;
 type Props = {
   value: Values;
   onChange: (patch: Partial<Values>) => void;
@@ -29,6 +29,12 @@ export default function RecipeFields({ value, onChange, variant = "default", aut
     <FormField variant={variant} label="Horas por receita">
       <FormControl required type="number" min="0" step="0.1" suffix="horas" value={value.hoursPerBatch}
         onChange={(event) => onChange({ hoursPerBatch: Math.max(0, Number(event.target.value)) })} />
+    </FormField>
+    <FormField variant={variant} label="Validade">
+      <FormControl type="number" min="0" step="1" suffix="dias" placeholder="Não informada" value={value.shelfLifeDays ?? ""}
+        onChange={(event) => onChange({
+          shelfLifeDays: event.target.value === "" ? null : Math.max(0, Math.round(Number(event.target.value))),
+        })} />
     </FormField>
   </FormGrid>;
 }

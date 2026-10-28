@@ -115,41 +115,54 @@
   padding: 13px 14px;
   border: 1px solid #e8eee7;
   border-radius: 10px;
+}
 
-  dl {
+.comparison-grid {
+  margin-top: 8px;
+
+  > div {
     display: grid;
+    grid-template-columns: minmax(80px, 0.8fr) repeat(2, minmax(0, 1fr));
+    align-items: baseline;
     gap: 10px;
-    margin: 10px 0 0;
+    padding: 8px 0;
+    border-bottom: 1px solid var(--line);
   }
 
-  dl > div {
-    display: grid;
-    grid-template-columns: 90px repeat(3, minmax(0, 1fr));
-    align-items: end;
-    gap: 10px;
+  > div:last-child {
+    border-bottom: 0;
   }
 
-  dt {
-    color: #4f5a50;
-    font-size: 13px;
-    font-weight: 700;
-  }
-
-  dd {
+  span {
     min-width: 0;
-    margin: 0;
     color: var(--ink);
     font-size: 14px;
     font-weight: 700;
+    text-align: right;
     overflow-wrap: anywhere;
   }
 
-  small {
-    display: block;
-    margin-bottom: 2px;
-    color: var(--muted);
-    font-size: 11px;
+  span:first-child {
+    color: #737b72;
+    font-size: 12px;
     font-weight: 400;
+    text-align: left;
+  }
+}
+
+.comparison-head span {
+  color: #4f5a50 !important;
+  font-size: 12px !important;
+  font-weight: 700 !important;
+}
+
+.comparison-gap {
+  margin-top: 2px;
+  border-top: 1px dashed #d9e0d7;
+
+  span:first-child {
+    color: #4f5a50 !important;
+    font-weight: 700 !important;
   }
 }
 
@@ -190,12 +203,5 @@
 @media (max-width: 480px) {
   .values {
     grid-template-columns: minmax(0, 1fr);
-  }
-  .comparison dl > div {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-
-    dt {
-      grid-column: 1 / -1;
-    }
   }
 }

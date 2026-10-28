@@ -10,6 +10,12 @@ import {
   type SheetRow,
 } from "../utils/parsing";
 
+function asShelfLife(value: unknown) {
+  if (value === undefined || value === null || String(value).trim() === "") return null;
+  const days = Math.round(asNumber(value, -1));
+  return days >= 0 ? days : null;
+}
+
 export function exportWorkbook({
   market,
   recipes,
@@ -35,6 +41,7 @@ export function exportWorkbook({
         Categoria: recipe.category,
         Rendimento: recipe.yield,
         "Horas por receita": recipe.hoursPerBatch,
+        "Validade (dias)": recipe.shelfLifeDays ?? "",
       })),
     ),
     "Receitas",
@@ -181,6 +188,9 @@ export async function importWorkbook(file: File) {
             "horas",
           ]),
           0,
+        ),
+        shelfLifeDays: asShelfLife(
+          valueFor(row, ["validade (dias)", "validade", "validade em dias"]),
         ),
         ingredients: [],
       };

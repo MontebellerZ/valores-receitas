@@ -13,6 +13,8 @@ export type Recipe = {
   category: string;
   yield: number;
   hoursPerBatch: number;
+  /** Validade em dias após a data de produção; vazio quando não informada. */
+  shelfLifeDays?: number | null;
   ingredients: Ingredient[];
 };
 
