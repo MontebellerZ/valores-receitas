@@ -210,7 +210,7 @@ npm install
 npm run dev
 ```
 
-Abra o endereço exibido pelo Vite no terminal, normalmente `http://localhost:5173`. Se a porta estiver ocupada, o Vite pode usar outra.
+Abra `http://localhost:5174`. A porta está fixa para coincidir com a origem permitida na configuração local da API.
 
 O desenvolvimento roda na raiz `/`, sem prefixo do nome do projeto. Configure o endereço da API no arquivo `.env` desta pasta:
 
@@ -222,13 +222,13 @@ Informe o endereço completo da base da API, incluindo `/api` no final. O Axios 
 
 O `.env` local é ignorado pelo Git; `.env.example` contém o modelo. Se alterar o endereço, reinicie o Vite; para `preview`, gere o build novamente. Inicie a API separadamente no endereço configurado. Para que os links de confirmação de email retornem para a tela correta, mantenha `Frontend:BaseUrl` na API igual à URL local do front.
 
-Como a comunicação é direta entre origens diferentes, configure `Cors:AllowedOrigins` no `appsettings.json` da API com a origem exata do front (incluindo porta) e mantenha a permissão de credenciais. A configuração local permite `http://localhost:5173` e `http://localhost:4173`, além dos equivalentes em `127.0.0.1`. Use o mesmo host para front e API: com a API em `localhost`, acesse o front também por `localhost`, para preservar os cookies `SameSite=Lax`.
+Como a comunicação é direta entre origens diferentes, configure `Cors:AllowedOrigins` no `appsettings.json` da API com a origem exata do front (incluindo porta) e mantenha a permissão de credenciais. A configuração de exemplo permite `http://localhost:5174` e `http://localhost:4173`, além dos equivalentes em `127.0.0.1`. Use o mesmo host para front e API: com a API em `localhost`, acesse o front também por `localhost`, para preservar os cookies `SameSite=Lax`.
 
 ### Comandos
 
 | Comando           | Finalidade                                                                       |
 | ----------------- | -------------------------------------------------------------------------------- |
-| `npm run dev`     | Inicia o servidor de desenvolvimento.                                            |
+| `npm run dev`     | Inicia o servidor de desenvolvimento em `http://localhost:5174`.                 |
 | `npm run build`   | Verifica os tipos TypeScript e gera a versão de produção em `dist/`.             |
 | `npm run preview` | Serve localmente o build gerado para conferência. Não é um servidor de produção. |
 | `npm run lint`    | Executa o ESLint.                                                                |
@@ -242,6 +242,10 @@ npm run preview
 ```
 
 O projeto está configurado para execução local. Não há workflow de deploy no GitHub Pages nem configuração de prefixo por ambiente. Sirva o build em `dist/` por HTTP (por exemplo, com `npm run preview`), não abra diretamente como arquivo HTML. A URL da API é incorporada ao build a partir do `.env` e não depende do servidor Vite para encaminhamento.
+
+O workflow de CI executa testes, lint e build usando `npm ci`; mantenha `package-lock.json` versionado para reproduzir as dependências verificadas.
+
+As telas são carregadas sob demanda, e a biblioteca de planilhas só é baixada ao importar ou exportar. O SheetJS é instalado da distribuição oficial `cdn.sheetjs.com` (0.20.3), pois o pacote publicado no registro npm está desatualizado e contém versões vulneráveis.
 
 ## Tecnologias e organização
 

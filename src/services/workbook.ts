@@ -1,4 +1,3 @@
-import * as XLSX from "xlsx";
 import type { MarketItem, Recipe, WorkspaceData } from "../domain/models";
 import { calculateProduction } from "../domain/calculations";
 import { makeId } from "../utils/format";
@@ -16,12 +15,13 @@ function asShelfLife(value: unknown) {
   return days >= 0 ? days : null;
 }
 
-export function exportWorkbook({
+export async function exportWorkbook({
   market,
   recipes,
   productions,
   sales,
 }: WorkspaceData) {
+  const XLSX = await import("xlsx");
   const workbook = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(
     workbook,
@@ -111,6 +111,7 @@ export function exportWorkbook({
 }
 
 export async function importWorkbook(file: File) {
+  const XLSX = await import("xlsx");
   const workbook = XLSX.read(await file.arrayBuffer(), { type: "array" });
   const sheets = workbook.SheetNames.map((name) => ({
     name: normalize(name),

@@ -23,10 +23,6 @@ import {
   type ProductionSalesStats,
   type SaleTarget,
 } from "../domain/workspaceRules";
-import {
-  exportWorkbook as exportWorkbookFile,
-  importWorkbook as importWorkbookFile,
-} from "../services/workbook";
 import { queryService } from "../services/query";
 import * as recipeEdits from "../domain/recipeEdits";
 import { getApiErrorMessage } from "../services/http";
@@ -283,7 +279,8 @@ export function useWorkspace(userId: string) {
   const exportWorkbook = async () => {
     try {
       const all = await data.loadAll();
-      exportWorkbookFile(all);
+      const { exportWorkbook: exportWorkbookFile } = await import("../services/workbook");
+      await exportWorkbookFile(all);
       toast.success("Planilha exportada para conta-de-chef.xlsx.");
     } catch (error) {
       toast.error(getApiErrorMessage(error, "Não foi possível exportar a planilha."));
@@ -293,6 +290,7 @@ export function useWorkspace(userId: string) {
   /** Import reads the current records in bulk to merge by name and saves only what changed. */
   const importWorkbook = async (file: File) => {
     try {
+      const { importWorkbook: importWorkbookFile } = await import("../services/workbook");
       const imported = await importWorkbookFile(file);
       const { market, recipes } = await data.loadAll();
       const idMap = new Map<string, string>();

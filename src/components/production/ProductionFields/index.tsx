@@ -20,7 +20,7 @@ type Props = {
 export default function ProductionFields({
   value, onChange, locked = false, disabled = false, variant = "default", autoFocus = false,
 }: Props) {
-  return <FormGrid variant={variant === "registration" ? "grid" : "wrap"} className={styles.fields}>
+  return <FormGrid variant="grid" className={styles.fields}>
     <FormField variant={variant} label="Data da produção">
       <FormControl autoFocus={autoFocus} required disabled={disabled} type="date" value={value.date}
         onChange={(event) => onChange({ date: event.target.value })} />
