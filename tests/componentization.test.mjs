@@ -256,6 +256,19 @@ test("shared form and metric grids own desktop, tablet and mobile breakpoints", 
   assert.match(metric, /\.results \.metric-card\.compact > strong\s*\{\s*font-size: 13px;/);
 });
 
+test("production fields share separate label, control and caption rows without stretching controls", async () => {
+  const { default: Fields } = await load("production/ProductionFields");
+  for (const variant of ["default", "registration"]) {
+    const fields = Fields({ value: production, variant, onChange() {} });
+    assert.equal(fields.props.variant, "grid");
+  }
+  const css = sass.compile(path.join(root, "src", "components", "production", "ProductionFields", "styles.module.scss")).css;
+  assert.match(css, /\.fields > label\s*\{[^}]*display: grid;/);
+  assert.match(css, /\.fields > label\s*\{[^}]*grid-row: span 3;/);
+  assert.match(css, /\.fields > label\s*\{[^}]*grid-template-rows: subgrid;/);
+  assert.match(css, /\.fields > label\s*\{[^}]*align-items: start;/);
+});
+
 test("busy registration dialogs disable close and expose their pending state", async () => {
   const { default: Modal } = await load("ui/RegistrationModal");
   const html = render(Modal, { title: "Cadastrar produção", busy: true, onClose() {} });

@@ -1,3 +1,16 @@
+.fields {
+  row-gap: 6px;
+
+  > label {
+    display: grid;
+    grid-row: span 3;
+    grid-template-rows: subgrid;
+    align-items: start;
+    gap: 6px;
+    margin-bottom: 9px;
+  }
+}
+
 .fields small {
   color: #69766d;
 }
