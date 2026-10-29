@@ -1,4 +1,4 @@
-import type { WorkspaceData, StockLot, StockEntry, StockConsumption, StockCorrection } from "../domain/models";
+import type { WorkspaceData, WorkspacePatch, StockLot, StockEntry, StockCorrection } from "../domain/models";
 import { api } from "./http";
 
 const normalizeSnapshot = (data: WorkspaceData): WorkspaceData => ({
@@ -10,20 +10,27 @@ const normalizeSnapshot = (data: WorkspaceData): WorkspaceData => ({
 });
 
 export const workspaceService = {
+  /** Explicit bulk read, used only by workbook export/import. */
   async load(signal?: AbortSignal) {
     const { data } = await api.get<WorkspaceData>("/data", { signal });
     return normalizeSnapshot(data);
   },
+  /** Explicit bulk replacement; ordinary screens save through `patch`. */
   async save(snapshot: WorkspaceData, signal?: AbortSignal) {
     const { data } = await api.put<WorkspaceData>("/data", snapshot, { signal });
     return normalizeSnapshot(data);
   },
-  async stock(signal?: AbortSignal) {
-    const { data } = await api.get<StockLot[]>("/stock", { signal, params: { includeInactive: true } });
-    return data;
+  /** Incremental save: only changed records and deleted ids; returns the canonical changed records. */
+  async patch(changes: WorkspacePatch, signal?: AbortSignal) {
+    const { data } = await api.patch<WorkspaceData>("/data", changes, { signal });
+    if (typeof data?.revision !== "number") throw new Error("A API não informou a nova revisão dos dados.");
+    return normalizeSnapshot({
+      market: data.market ?? [], recipes: data.recipes ?? [], productions: data.productions ?? [],
+      sales: data.sales ?? [], revision: data.revision,
+    });
   },
   async addStock(entry: StockEntry, revision: number) {
-    const { data } = await api.post<{ lot: StockLot; lots: StockLot[]; revision: number }>("/stock", { ...entry, revision });
+    const { data } = await api.post<{ lot: StockLot; lots: StockLot[] | null; revision: number }>("/stock", { ...entry, revision }, { params: { compact: true } });
     return data;
   },
   async adjustStock(id: string, remainingQty: number, reason: string, revision: number) {
@@ -33,15 +40,12 @@ export const workspaceService = {
     return data;
   },
   async updateStock(correction: StockCorrection, revision: number) {
-    const { data } = await api.put<{ lot: StockLot; lots: StockLot[]; revision: number }>("/stock", { ...correction, revision });
+    const { data } = await api.put<{ lot: StockLot; lots: StockLot[] | null; revision: number }>("/stock", { ...correction, revision }, { params: { compact: true } });
     return data;
   },
   async deleteStock(id: string, revision: number) {
-    await api.delete(`/stock/${encodeURIComponent(id)}`, { params: { revision } });
-    return { revision: revision + 1 };
-  },
-  async consumptions(id: string, signal?: AbortSignal) {
-    const { data } = await api.get<StockConsumption[]>(`/productions/${encodeURIComponent(id)}/consumptions`, { signal });
-    return data;
+    const { data } = await api.delete<{ revision: number }>(`/stock/${encodeURIComponent(id)}`, { params: { revision } });
+    if (typeof data?.revision !== "number") throw new Error("A API não informou a nova revisão dos dados.");
+    return { revision: data.revision };
   },
 };

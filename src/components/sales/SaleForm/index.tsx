@@ -2,7 +2,7 @@ import FormActions from "../../ui/FormActions";
 import FormLayout, { FormGrid } from "../../ui/FormLayout";
 import FormField from "../../ui/FormField";
 import FormControl from "../../ui/FormControl";
-import SearchableSelect from "../../ui/SearchableSelect";
+import RemoteSelect from "../../ui/RemoteSelect";
 import styles from "./styles.module.scss";
 import PageHeader from "../../ui/PageHeader";
 import { useEffect, useRef, useState, type FormEvent } from "react";
@@ -10,8 +10,9 @@ import { Check, Plus, Trash2 } from "lucide-react";
 import Button from "../../ui/Button";
 import BackButton from "../../ui/BackButton";
 import { toast } from "react-toastify";
-import type { Sale, SaleDraft, SalesProduction } from "../../../domain/models";
+import type { ProductionBalance, Sale, SaleDraft } from "../../../domain/models";
 import { remainingPackages } from "../../../domain/calculations";
+import { queryService } from "../../../services/query";
 import RegistrationModal from "../../ui/RegistrationModal";
 import {
   money,
@@ -22,8 +23,13 @@ import {
 } from "../../../utils/format";
 
 type Props = {
-  productions: SalesProduction[];
-  sales: Sale[];
+  /**
+   * Balance of the production preselected in the form: the edited sale's production or,
+   * for a new sale, the most recent production with packages available.
+   */
+  initialBalance?: ProductionBalance | null;
+  /** Packages available across every production (server summary), used to limit the cart. */
+  totalAvailable: number;
   onSave: (draft: SaleDraft) => Promise<string | undefined | null>;
   onSaveSales: (drafts: SaleDraft[]) => Promise<string | undefined | null>;
 };
@@ -54,8 +60,8 @@ function parseAmount(entry: SaleEntry) {
 }
 
 export default function SaleForm({
-  productions,
-  sales,
+  initialBalance,
+  totalAvailable,
   sale,
   onSave,
   onSaveSales,
@@ -66,11 +72,13 @@ export default function SaleForm({
   isModal?: boolean;
   onCancel: () => void;
 }) {
-  const soldPackages = (id: string) =>
-    sales
-      .filter((entry) => entry.productionId === id && entry.id !== sale?.id)
-      .reduce((total, entry) => total + entry.packages, 0);
-  const createEntry = (production?: SalesProduction, existing?: Sale): SaleEntry => ({
+  // Balances of every production picked in this form, as returned by the server.
+  const [known, setKnown] = useState<Record<string, ProductionBalance>>(() =>
+    initialBalance ? { [initialBalance.id]: initialBalance } : {});
+  /** Packages sold by the saved sales, excluding the sale being edited. */
+  const soldPackages = (balance: ProductionBalance) =>
+    balance.soldPackages - (sale && sale.productionId === balance.id ? sale.packages : 0);
+  const createEntry = (production?: ProductionBalance, existing?: Sale): SaleEntry => ({
     key: makeId(),
     productionId: existing?.productionId ?? production?.id ?? "",
     date: existing?.date ?? today(),
@@ -82,7 +90,7 @@ export default function SaleForm({
     notes: existing?.notes ?? "",
   });
   const [entries, setEntries] = useState<SaleEntry[]>(() => [
-    createEntry(productions.find((production) => remainingPackages(production, soldPackages(production.id)) > 0), sale),
+    createEntry(initialBalance ?? undefined, sale),
   ]);
   const [activeKey, setActiveKey] = useState(entries[0].key);
   const [isSaving, setIsSaving] = useState(false);
@@ -102,9 +110,13 @@ export default function SaleForm({
         const quantity = Number(entry.packages);
         return total + (Number.isInteger(quantity) && quantity > 0 ? quantity : 0);
       }, 0);
-  const availablePackages = (production: SalesProduction, exceptKey?: string) =>
-    remainingPackages(production, soldPackages(production.id) + reservedPackages(production.id, exceptKey));
-  const nextProduction = productions.find((production) => availablePackages(production) > 0);
+  const availablePackages = (production: ProductionBalance, exceptKey?: string) =>
+    remainingPackages(production, soldPackages(production) + reservedPackages(production.id, exceptKey));
+  const cartPackages = entries.reduce((total, entry) => {
+    const quantity = Number(entry.packages);
+    return total + (Number.isInteger(quantity) && quantity > 0 ? quantity : 0);
+  }, 0);
+  const canAddEntry = totalAvailable - cartPackages > 0;
   const amounts = entries.map(parseAmount);
   const total = amounts.reduce((sum, amount) => sum + amount.quantity * amount.price, 0);
   const validTotal = amounts.every((amount) => amount.valid) && Number.isFinite(total);
@@ -114,7 +126,7 @@ export default function SaleForm({
     if (isSaving) return;
     const drafts: SaleDraft[] = [];
     for (const [index, entry] of entries.entries()) {
-      const selected = productions.find((production) => production.id === entry.productionId);
+      const selected = known[entry.productionId];
       const { quantity, price, valid } = parseAmount(entry);
       if (!selected || !/^\d{4}-\d{2}-\d{2}$/.test(entry.date) ||
         !Number.isFinite(new Date(`${entry.date}T12:00:00`).getTime()) ||
@@ -170,7 +182,7 @@ export default function SaleForm({
         <fieldset className={[styles["sales-cart"], !sale ? styles["sales-cart-layout"] : ""].filter(Boolean).join(" ")} disabled={isSaving}>
         {entries.map((entry, index) => {
           if (entry.key !== activeKey) return null;
-          const selected = productions.find((production) => production.id === entry.productionId);
+          const selected = known[entry.productionId];
           const available = selected ? availablePackages(selected, entry.key) : 0;
           const amount = amounts[index];
           return <section key={entry.key} className={styles["sales-cart-entry"]} aria-label={`Venda ${index + 1}`}>
@@ -180,26 +192,34 @@ export default function SaleForm({
         <FormGrid className={styles["sales-form-fields"]}>
           <FormField className={styles["sales-production-field"]} label="Produção">
             
-            <SearchableSelect
+            <RemoteSelect
               required
               value={entry.productionId}
               placeholder="Selecione uma produção"
-              onChange={(id) => {
-                const production = productions.find(
-                  (entry) => entry.id === id,
-                );
+              selectedLabel={selected
+                ? `${selected.recipeName} · ${dateLabel(selected.date)} · ${count(available)} disponíveis` : undefined}
+              fetcher={queryService.balances}
+              filters={{ available: true }}
+              sortBy="date"
+              descending
+              toOption={(balance: ProductionBalance) => {
+                // Prefer the copy already in the form so cart reservations are counted on the same totals.
+                const production = known[balance.id] ?? balance;
+                const left = availablePackages(production, entry.key);
+                return {
+                  value: balance.id,
+                  label: `${balance.recipeName} · ${dateLabel(balance.date)} · ${count(left)} disponíveis`,
+                  disabled: left <= 0 && balance.id !== entry.productionId,
+                };
+              }}
+              onChange={(id, balance) => {
+                const production = balance ?? known[id];
+                if (balance) setKnown((current) => ({ ...current, [balance.id]: current[balance.id] ?? balance }));
                 updateEntry(entry.key, {
                   productionId: id,
                   ...(production && !entry.donated ? { price: priceText(production.expectedSalePrice ?? production.salePrice) } : {}),
                 });
               }}
-              options={productions
-                // Keeps the current selection visible even if it has no packages left.
-                .filter((production) => production.id === entry.productionId || availablePackages(production, entry.key) > 0)
-                .map((production) => ({
-                  value: production.id,
-                  label: `${production.recipeName} · ${dateLabel(production.date)} · ${count(availablePackages(production, entry.key))} disponíveis`,
-                }))}
             />
           </FormField>
           <FormField label="Data da venda">
@@ -287,7 +307,7 @@ export default function SaleForm({
           <ul ref={cartListRef} className={styles["sales-cart-list"]}>
             {entries.map((entry, index) => {
               const amount = amounts[index];
-              const production = productions.find((item) => item.id === entry.productionId);
+              const production = known[entry.productionId];
               return <li key={entry.key} className={styles["sales-cart-item"]}>
                 <Button variant="text" className={styles["sales-cart-select"]}
                   aria-label={`Editar venda ${index + 1}`}
@@ -310,13 +330,13 @@ export default function SaleForm({
               </li>;
             })}
           </ul>
-        <Button variant="secondary" disabled={!nextProduction}
+        <Button variant="secondary" disabled={!canAddEntry}
           onClick={() => {
             const activeEntry = entries.find((item) => item.key === activeKey) ?? entries[0];
-            const activeProduction = productions.find((item) => item.id === activeEntry.productionId);
+            const activeProduction = known[activeEntry.productionId];
             const production = activeProduction && availablePackages(activeProduction) > 0
               ? activeProduction
-              : nextProduction;
+              : Object.values(known).find((item) => availablePackages(item) > 0);
             const entry = {
               ...createEntry(production),
               date: activeEntry.date,
@@ -327,7 +347,7 @@ export default function SaleForm({
           }}>
           <Plus size={17} aria-hidden="true" /> Adicionar outra venda
         </Button>
-        {!nextProduction && <p role="status">Não há mais pacotes disponíveis para adicionar outra venda.</p>}
+        {!canAddEntry && <p role="status">Não há mais pacotes disponíveis para adicionar outra venda.</p>}
         </aside>}
         </fieldset>
         <div className={styles["sales-form-footer"]}>

@@ -23,12 +23,12 @@ export default function Workspace({ session, signOut }: Props) {
         session={session}
         apiStatus={workspace.apiStatus}
         hasUnsavedChanges={workspace.hasUnsavedChanges}
-        recipeCount={workspace.recipes.length}
-        productionCount={workspace.productions.length}
-        salesCount={workspace.sales.length}
-        marketCount={workspace.market.length}
+        recipeCount={workspace.counts.recipes}
+        productionCount={workspace.counts.productions}
+        salesCount={workspace.counts.sales}
+        marketCount={workspace.counts.market}
         signOut={requestSignOut}
-        exportWorkbook={workspace.exportWorkbook}
+        exportWorkbook={() => void workspace.exportWorkbook()}
       >
         {workspace.hasUnsavedChanges && (
           <UnsavedChangesBar

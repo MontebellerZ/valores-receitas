@@ -8,6 +8,16 @@ type Props = ComponentProps<"table"> & {
   variant?: "default" | "sales" | "compact";
   containerClassName?: string;
   defaultSort?: { column: number; direction: SortDirection };
+  /** Server-side ordering: only mapped columns are sortable and rows are rendered as received. */
+  serverSort?: ServerSort;
+};
+
+export type ServerSort = {
+  /** Column index mapped to the API `sortBy` field. */
+  columns: Record<number, string>;
+  sortBy?: string;
+  descending: boolean;
+  onSort: (sortBy: string, descending: boolean) => void;
 };
 
 type TableNodeProps = {
@@ -24,16 +34,28 @@ function sortValue(row: ReactNode, column: number): SortValue {
   return isValidElement<TableNodeProps>(cell) ? cell.props["data-sort-value"] : undefined;
 }
 
-export default function DataTable({ variant = "default", containerClassName, className, children, defaultSort, ...props }: Props) {
-  const [sort, setSort] = useState(defaultSort);
+export default function DataTable({ variant = "default", containerClassName, className, children, defaultSort, serverSort, ...props }: Props) {
+  const [localSort, setLocalSort] = useState(defaultSort);
   const sections = Children.toArray(children);
   const body = sections.find((section) => isValidElement(section) && section.type === "tbody");
   const rows = cells(body);
-  const sortable = new Set(rows.flatMap((row) => cells(row).flatMap((cell, column) =>
-    isValidElement<TableNodeProps>(cell) && Object.hasOwn(cell.props, "data-sort-value") ? [column] : [])));
+  const sortable = serverSort
+    ? new Set(Object.keys(serverSort.columns).map(Number))
+    : new Set(rows.flatMap((row) => cells(row).flatMap((cell, column) =>
+      isValidElement<TableNodeProps>(cell) && Object.hasOwn(cell.props, "data-sort-value") ? [column] : [])));
+  const serverColumn = serverSort && Object.entries(serverSort.columns)
+    .find(([, field]) => field === serverSort.sortBy)?.[0];
+  const sort: { column: number; direction: SortDirection } | undefined = serverSort
+    ? serverColumn === undefined ? undefined
+      : { column: Number(serverColumn), direction: serverSort.descending ? "descending" : "ascending" }
+    : localSort;
+  const setSort = (next: { column: number; direction: SortDirection }) => {
+    if (serverSort) serverSort.onSort(serverSort.columns[next.column], next.direction === "descending");
+    else setLocalSort(next);
+  };
   const content = sections.map((section) => {
     if (!isValidElement<TableNodeProps>(section)) return section;
-    if (section.type === "tbody" && sort && sortable.has(sort.column)) {
+    if (!serverSort && section.type === "tbody" && sort && sortable.has(sort.column)) {
       return cloneElement(section, {}, [...cells(section)].sort((left, right) =>
         compareSortValues(sortValue(left, sort.column), sortValue(right, sort.column), sort.direction)));
     }

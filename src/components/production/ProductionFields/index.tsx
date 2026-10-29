@@ -1,15 +1,15 @@
-import type { Production, Recipe } from "../../../domain/models";
+import type { Production, RecipeListItem } from "../../../domain/models";
+import { queryService } from "../../../services/query";
 import { number } from "../../../utils/format";
 import FormField from "../../ui/FormField";
 import FormControl from "../../ui/FormControl";
 import { FormGrid } from "../../ui/FormLayout";
-import SearchableSelect from "../../ui/SearchableSelect";
+import RemoteSelect from "../../ui/RemoteSelect";
 import styles from "./styles.module.scss";
 
 type Draft = Omit<Production, "id">;
 type Props = {
   value: Draft;
-  recipes: Recipe[];
   onChange: (patch: Partial<Draft>) => void;
   locked?: boolean;
   disabled?: boolean;
@@ -18,7 +18,7 @@ type Props = {
 };
 
 export default function ProductionFields({
-  value, recipes, onChange, locked = false, disabled = false, variant = "default", autoFocus = false,
+  value, onChange, locked = false, disabled = false, variant = "default", autoFocus = false,
 }: Props) {
   return <FormGrid variant={variant === "registration" ? "grid" : "wrap"} className={styles.fields}>
     <FormField variant={variant} label="Data da produção">
@@ -26,14 +26,11 @@ export default function ProductionFields({
         onChange={(event) => onChange({ date: event.target.value })} />
     </FormField>
     <FormField variant={variant} label="Receita">
-      <SearchableSelect required disabled={locked || disabled} value={value.recipeId}
-        options={[
-          ...(!recipes.some((recipe) => recipe.id === value.recipeId)
-            ? [{ value: value.recipeId, label: `${value.recipeName} (ficha removida)` }] : []),
-          ...recipes.map((recipe) => ({ value: recipe.id, label: recipe.name || "Receita sem nome" })),
-        ]}
-        onChange={(recipeId) => {
-          const recipe = recipes.find((item) => item.id === recipeId);
+      <RemoteSelect required disabled={locked || disabled} value={value.recipeId}
+        selectedLabel={value.recipeName}
+        fetcher={queryService.recipes} sortBy="name"
+        toOption={(recipe: RecipeListItem) => ({ value: recipe.id, label: recipe.name || "Receita sem nome" })}
+        onChange={(_recipeId, recipe) => {
           if (recipe && !locked) onChange({
             recipeId: recipe.id, recipeName: recipe.name || "Receita sem nome",
             yieldPerBatch: recipe.yield, actualYield: recipe.yield * value.quantity,

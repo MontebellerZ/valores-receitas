@@ -9,14 +9,25 @@ import SummaryItem, { SummaryList } from "../../../components/ui/SummaryItem";
 import EmptyState from "../../../components/ui/EmptyState";
 import RegistrationModal from "../../../components/ui/RegistrationModal";
 import SplitButton from "../../../components/ui/SplitButton";
-import type { CalculatedProduction, Production, Recipe } from "../../../domain/models";
+import type { CalculatedProduction, Production, RecipeListItem } from "../../../domain/models";
+import Pagination from "../../../components/ui/Pagination";
+import Panel from "../../../components/ui/Panel";
+import SearchField from "../../../components/ui/SearchField";
+import type { ListControls } from "../../../hooks/usePagedQuery";
+import styles from "./styles.module.scss";
 import { remainingPackages } from "../../../domain/calculations";
 import { localToday, money, number } from "../../../utils/format";
 import { toast } from "react-toastify";
 
-type Props = {
+type Props = Omit<ListControls, "serverSort"> & {
+  /** Current page, ordered by date (most recent first) on the server. */
   productions: CalculatedProduction[];
-  recipes: Recipe[];
+  totalCount: number;
+  recipeCount: number;
+  search: string;
+  onSearch: (search: string) => void;
+  /** First recipe by name, used as the default of a new production. */
+  loadFirstRecipe: () => Promise<RecipeListItem | undefined>;
   onCreate: (production: Omit<Production, "id">) => Promise<Production>;
   onView: (id: string) => void;
   onViewRecipes: () => void;
@@ -24,7 +35,13 @@ type Props = {
 
 export default function ProductionsPage({
   productions: calculated,
-  recipes,
+  totalCount,
+  recipeCount,
+  search,
+  onSearch,
+  loadFirstRecipe,
+  pagination,
+  status,
   onCreate,
   onView,
   onViewRecipes,
@@ -32,8 +49,14 @@ export default function ProductionsPage({
   const [isAdding, setIsAdding] = useState(false);
   const [busy, setBusy] = useState(false);
   const [draft, setDraft] = useState<Omit<Production, "id"> | null>(null);
-  const startCreating = (isStandalone = false) => {
-    const recipe = recipes[0];
+  const startCreating = async (isStandalone = false) => {
+    let recipe: RecipeListItem | undefined;
+    try {
+      recipe = await loadFirstRecipe();
+    } catch {
+      toast.error("Não foi possível carregar as receitas.");
+      return;
+    }
     if (!recipe) {
       onViewRecipes();
       toast.info("Cadastre uma receita antes de registrar uma produção.");
@@ -78,28 +101,28 @@ export default function ProductionsPage({
         title="Produção"
         eyebrow="REGISTRO E RESULTADOS"
         eyebrowDot
-        description={`${calculated.length} registros de produção`}
+        description={`${totalCount} registros de produção`}
         action={
           <SplitButton
-            onClick={() => startCreating()}
-            disabled={!recipes.length}
+            onClick={() => void startCreating()}
+            disabled={!recipeCount}
             menuLabel="Mais opções de registro de produção"
             options={[
               { label: "Registrar produção", description: "Calcula o custo consumindo o estoque.",
-                onSelect: () => startCreating() },
+                onSelect: () => void startCreating() },
               { label: "Registrar produção avulsa", description: "Sem estoque; informe o custo manualmente.",
-                onSelect: () => startCreating(true) },
+                onSelect: () => void startCreating(true) },
             ]}
           >
             <Icon name="plus" size={17} /> Registrar produção
           </SplitButton>
         }
       />
-      {calculated.length > 0 ? (
+      {totalCount > 0 || search ? (
+        <Panel title="Registros" action={<SearchField aria-label="Buscar produção" placeholder="Buscar receita..."
+          value={search} onChange={(event) => onSearch(event.target.value)} className={styles.search} />}>
         <SummaryList aria-label="Lista de produção">
           {calculated
-            .slice()
-            .sort((first, second) => second.date.localeCompare(first.date))
             .map((production) => {
               const hasExpectedPrice =
                 production.expectedSalePrice !== undefined;
@@ -134,8 +157,12 @@ export default function ProductionsPage({
                   viewTitle="Visualizar produção" onView={() => onView(production.id)} />
               );
             })}
+          {status === "error" ? <EmptyState>Não foi possível carregar as produções.</EmptyState>
+            : !calculated.length && status === "ready" && <EmptyState>Nenhuma produção encontrada.</EmptyState>}
         </SummaryList>
-      ) : !recipes.length ? (
+        <Pagination {...pagination} label="produções" />
+        </Panel>
+      ) : !recipeCount ? (
         <EmptyState variant="editor" title="Cadastre uma receita primeiro"
           icon={<Icon name="recipe" size={28} />}
           action={<Button onClick={onViewRecipes}>
@@ -149,7 +176,7 @@ export default function ProductionsPage({
       ) : (
         <EmptyState variant="editor" title="Nenhuma produção registrada"
           icon={<Icon name="chart" size={28} />}
-          action={<Button onClick={() => startCreating()}>
+          action={<Button onClick={() => void startCreating()}>
             <Icon name="plus" size={16} /> Registrar primeira produção
           </Button>}>
           <p>
@@ -165,7 +192,7 @@ export default function ProductionsPage({
           onClose={() => setIsAdding(false)}
         >
           <FormLayout disabled={busy} onSubmit={(event) => void submitProduction(event)}>
-            <ProductionFields value={draft} recipes={recipes} variant="registration" autoFocus disabled={busy}
+            <ProductionFields value={draft} variant="registration" autoFocus disabled={busy}
               onChange={(patch) => setDraft({ ...draft, ...patch })} />
             <FormActions onCancel={() => setIsAdding(false)} disabled={busy} cancelDisabled={busy}
               submitLabel={busy ? "Cadastrando..." : "Cadastrar"} />

@@ -1,14 +1,15 @@
-import type { CalculatedProduction } from "../../../domain/models";
+import type { CalculatedProduction, ProductionBuyer } from "../../../domain/models";
 import type { ProductionReport } from "../../../domain/productionReport";
-import { number } from "../../../utils/format";
+import { money, number } from "../../../utils/format";
 import FormControl from "../../ui/FormControl";
 import FormField from "../../ui/FormField";
 import Panel from "../../ui/Panel";
 import styles from "./styles.module.scss";
 
-export default function PackageFlow({ production, report, disabled = false, onLostChange }: {
+export default function PackageFlow({ production, report, topBuyers, disabled = false, onLostChange }: {
   production: CalculatedProduction;
   report: ProductionReport;
+  topBuyers: ProductionBuyer[];
   disabled?: boolean;
   onLostChange: (lostPackages: number) => void;
 }) {
@@ -45,5 +46,21 @@ export default function PackageFlow({ production, report, disabled = false, onLo
       </FormField>
       <p>Pacotes prontos que venceram, foram roubados ou descartados. Eles deixam de ficar disponíveis para venda.</p>
     </div>
+    <section className={styles.ranking} aria-label="Top 5 compradores desta produção">
+      <h3>Top 5 compradores</h3>
+      <p>Quem mais comprou pacotes nesta produção.</p>
+      {topBuyers.length === 0 ? <p>Nenhuma compra registrada nesta produção.</p> : (
+        <ol className={styles.buyers}>
+          {topBuyers.map((buyer, index) => <li key={buyer.customer}>
+            <span className={styles.position} aria-hidden="true">{index + 1}º</span>
+            <strong className={styles.customer}>{buyer.customer || "Cliente não informado"}</strong>
+            <span className={styles.purchase}>
+              <span>{number(buyer.packages)} pacote(s)</span>
+              <strong>{money(buyer.spent)}</strong>
+            </span>
+          </li>)}
+        </ol>
+      )}
+    </section>
   </Panel>;
 }

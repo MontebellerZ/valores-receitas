@@ -1,0 +1,28 @@
+.pagination {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 12px 4px 0;
+  color: #687066;
+  font-size: 12px;
+}
+
+.range {
+  white-space: nowrap;
+}
+
+.controls {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.position {
+  white-space: nowrap;
+}
+
+.size {
+  width: 140px;
+}

@@ -7,22 +7,26 @@ import type {
 import { calculateProduction, remainingPackages } from "./calculations";
 import { makeId, number } from "../utils/format";
 
+/** Agregados das vendas de uma produção, calculados pelo servidor. */
+export type ProductionSalesStats = {
+  salesCount: number;
+  soldPackages: number;
+  firstSaleDate: string | null;
+};
+
 export function validateProductionUpdate(
   production: Production,
   patch: Partial<Production>,
-  sales: Sale[],
+  stats: ProductionSalesStats,
 ) {
   if (production.quantity > 0 &&
       ((patch.recipeId !== undefined && patch.recipeId !== production.recipeId) ||
        (patch.quantity !== undefined && patch.quantity !== production.quantity))) {
     return "Receita e quantidade são imutáveis após salvar a produção e consumir o estoque.";
   }
-  const linkedSales = sales.filter(
-    (sale) => sale.productionId === production.id,
-  );
-  const sold = linkedSales.reduce((total, sale) => total + sale.packages, 0);
+  const sold = stats.soldPackages;
   if (
-    linkedSales.length &&
+    stats.salesCount > 0 &&
     ((patch.recipeId !== undefined && patch.recipeId !== production.recipeId) ||
       (patch.packageQty !== undefined &&
         patch.packageQty !== production.packageQty))
@@ -40,7 +44,7 @@ export function validateProductionUpdate(
   if (next.packages - lost < sold) {
     return `Esta produção tem ${number(next.packages)} pacotes e ${number(sold)} já foram vendidos. No máximo ${number(next.packages - sold)} pacotes podem ser marcados como perdidos.`;
   }
-  if (patch.date && linkedSales.some((sale) => sale.date < patch.date!)) {
+  if (patch.date && stats.firstSaleDate && stats.firstSaleDate < patch.date) {
     return "A data da produção não pode ser posterior às vendas já registradas.";
   }
 }
@@ -48,41 +52,46 @@ export function validateProductionUpdate(
 type SaleResult =
   { sale: Sale; error?: never } | { sale?: never; error: string };
 
+/** Produção candidata a venda com o total já vendido por todas as vendas gravadas. */
+export type SaleTarget = { production: CalculatedProduction; soldPackages: number };
+
 export function prepareSales(
   drafts: SaleDraft[],
-  productions: CalculatedProduction[],
-  sales: Sale[],
+  targets: SaleTarget[],
 ): { sales: Sale[]; error?: never } | { sales?: never; error: string } {
   if (drafts.length === 0)
     return { error: "Adicione pelo menos uma venda ao carrinho." };
+  const reserved = new Map<string, number>();
   const prepared: Sale[] = [];
   for (const [index, draft] of drafts.entries()) {
     if (draft.id)
       return { error: "O carrinho permite apenas cadastrar novas vendas." };
-    const result = prepareSale(draft, productions, [...sales, ...prepared]);
+    const target = targets.find((entry) => entry.production.id === draft.productionId);
+    const sold = (target?.soldPackages ?? 0) + (reserved.get(draft.productionId) ?? 0);
+    const result = prepareSale(draft, target?.production, sold);
     if (result.error !== undefined)
       return { error: `Venda ${index + 1}: ${result.error}` };
+    reserved.set(draft.productionId, (reserved.get(draft.productionId) ?? 0) + result.sale.packages);
     prepared.push(result.sale);
   }
   return { sales: prepared };
 }
 
+/**
+ * Valida uma venda contra a produção escolhida. `soldByOthers` é o total de pacotes
+ * já registrados na produção sem contar a própria venda em edição.
+ */
 export function prepareSale(
   draft: SaleDraft,
-  productions: CalculatedProduction[],
-  sales: Sale[],
+  production: CalculatedProduction | undefined | null,
+  soldByOthers: number,
+  existing?: Sale | null,
 ): SaleResult {
-  const production = productions.find(
-    (entry) => entry.id === draft.productionId,
-  );
-  if (!production)
+  if (!production || production.id !== draft.productionId)
     return { error: "A produção selecionada não está disponível." };
   if (production.quantity <= 0)
     return { error: "Salve a produção e consuma o estoque antes de registrar vendas." };
-  const existing = draft.id
-    ? sales.find((sale) => sale.id === draft.id)
-    : undefined;
-  if (draft.id && !existing)
+  if (draft.id && (!existing || existing.id !== draft.id))
     return { error: "Esta venda não está mais disponível." };
   if (
     !Number.isInteger(draft.packages) ||
@@ -100,12 +109,7 @@ export function prepareSale(
   ) {
     return { error: "A data da venda deve ser igual ou posterior à produção." };
   }
-  const sold = sales
-    .filter(
-      (sale) => sale.productionId === production.id && sale.id !== draft.id,
-    )
-    .reduce((total, sale) => total + sale.packages, 0);
-  const available = remainingPackages(production, sold);
+  const available = remainingPackages(production, Math.max(0, soldByOthers));
   if (draft.packages > available) {
     return {
       error: `Esta produção tem apenas ${number(available)} pacotes disponíveis.`,

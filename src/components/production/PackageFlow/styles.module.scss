@@ -96,6 +96,69 @@
   }
 }
 
+.ranking {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px dashed #e4e8e2;
+
+  h3 {
+    margin: 0 0 6px;
+    color: var(--ink);
+    font-size: 15px;
+  }
+
+  p {
+    color: var(--muted);
+    font-size: 12px;
+    line-height: 1.45;
+  }
+}
+
+.buyers {
+  display: grid;
+  gap: 8px;
+  margin: 12px 0 0;
+  padding: 0;
+  list-style: none;
+
+  li {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 10px;
+    padding: 15px 10px;
+    border: 1px solid #eef0ec;
+    border-radius: 9px;
+    background: #fafbf9;
+  }
+}
+
+.position {
+  color: #4f7b62;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.customer {
+  overflow-wrap: anywhere;
+  color: var(--ink);
+  font-size: 13px;
+}
+
+.purchase {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--muted);
+  font-size: 12px;
+  text-align: right;
+  white-space: nowrap;
+
+  strong {
+    color: var(--ink);
+  }
+}
+
 @media (max-width: 680px) {
   .legend {
     grid-template-columns: repeat(2, minmax(0, 1fr));

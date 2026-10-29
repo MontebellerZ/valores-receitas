@@ -1,6 +1,6 @@
-import type { CalculatedProduction, Sale } from "./models";
+import type { CalculatedProduction, ProductionDayRow, ProductionSalesTotals } from "./models";
 import { remainingPackages } from "./calculations";
-import { balance, summarizeSales } from "./overview";
+import { balance } from "./overview";
 
 export type ProductionStatus = "no-packages" | "waiting" | "selling" | "closed";
 
@@ -21,56 +21,35 @@ export function expirationDate(date: string, shelfLifeDays?: number | null) {
   return fromUtc(toUtc(date) + Math.round(shelfLifeDays) * DAY);
 }
 
-export type ProductionDay = {
-  date: string;
-  sold: number;
-  donated: number;
-  total: number;
-  revenue: number;
-  /** Resultado acumulado ao fim do dia: faturamento acumulado menos o custo da produção. */
-  result: number;
-};
+export type ProductionDay = ProductionDayRow;
 
 /**
- * Saídas e resultado por dia, da data de produção até a última venda. Períodos longos
- * mantêm apenas os dias com movimento para que os gráficos continuem legíveis.
+ * Completa os dias sem movimento entre as linhas de uma página do relatório diário quando o
+ * intervalo é curto; períodos longos mantêm apenas os dias com movimento para que os gráficos
+ * continuem legíveis. O resultado acumulado de um dia vazio repete o do dia anterior.
  */
-export function buildDailyTimeline(production: CalculatedProduction, linkedSales: Sale[]): ProductionDay[] {
-  const byDate = new Map<string, Omit<ProductionDay, "date" | "result">>();
-  for (const sale of linkedSales) {
-    if (!sale.date) continue;
-    const entry = byDate.get(sale.date) ?? { sold: 0, donated: 0, total: 0, revenue: 0 };
-    if (sale.donated) entry.donated += sale.packages;
-    else entry.sold += sale.packages;
-    entry.total += sale.packages;
-    entry.revenue += sale.packages * sale.pricePerPackage;
-    byDate.set(sale.date, entry);
-  }
-  const saleDates = [...byDate.keys()].sort();
-  if (!saleDates.length) return [];
-  const first = production.date && production.date < saleDates[0] ? production.date : saleDates[0];
-  const last = saleDates[saleDates.length - 1];
+export function fillDailyGaps(rows: ProductionDayRow[]): ProductionDay[] {
+  const sorted = [...rows].sort((a, b) => a.date.localeCompare(b.date));
+  if (sorted.length < 2) return sorted;
+  const first = sorted[0].date;
+  const last = sorted[sorted.length - 1].date;
   const span = Math.round((toUtc(last) - toUtc(first)) / DAY) + 1;
-  const dates = span <= MAX_CONTINUOUS_DAYS
-    ? Array.from({ length: span }, (_, index) => fromUtc(toUtc(first) + index * DAY))
-    : [...new Set([first, ...saleDates])];
-  let revenue = 0;
-  return dates.map((date) => {
-    const entry = byDate.get(date) ?? { sold: 0, donated: 0, total: 0, revenue: 0 };
-    revenue += entry.revenue;
-    return { date, ...entry, result: balance(revenue, production.cost) };
+  if (span > MAX_CONTINUOUS_DAYS) return sorted;
+  const byDate = new Map(sorted.map((row) => [row.date, row]));
+  let previous = sorted[0];
+  return Array.from({ length: span }, (_, index) => {
+    const date = fromUtc(toUtc(first) + index * DAY);
+    const row = byDate.get(date) ?? { date, sold: 0, donated: 0, total: 0, revenue: 0, cumulativeRevenue: previous.cumulativeRevenue };
+    previous = row;
+    return row;
   });
 }
 
-export function buildProductionReport(production: CalculatedProduction, sales: Sale[]) {
-  const linkedSales = sales.filter((sale) => sale.productionId === production.id);
-  const totals = summarizeSales(linkedSales);
-  const donatedPackages = linkedSales
-    .filter((sale) => sale.donated)
-    .reduce((total, sale) => total + sale.packages, 0);
-  const soldPackages = totals.packages - donatedPackages;
+export function buildProductionReport(production: CalculatedProduction, totals: ProductionSalesTotals) {
+  const { donatedPackages, salesCount } = totals;
+  const soldPackages = totals.outPackages - donatedPackages;
   const lostPackages = Math.min(production.lostPackages ?? 0, production.packages);
-  const availablePackages = remainingPackages(production, totals.packages);
+  const availablePackages = remainingPackages(production, totals.outPackages);
   const expectedYield = production.yieldPerBatch * production.quantity;
   const leftoverUnits = Math.max(0, production.produced - production.packages * production.packageQty);
   const price = production.expectedSalePrice ?? production.salePrice;
@@ -82,23 +61,23 @@ export function buildProductionReport(production: CalculatedProduction, sales: S
   const status: ProductionStatus =
     production.packages === 0 ? "no-packages"
       : availablePackages === 0 ? "closed"
-        : totals.packages === 0 ? "waiting" : "selling";
+        : totals.outPackages === 0 ? "waiting" : "selling";
 
   return {
-    linkedSales,
-    salesCount: linkedSales.length,
+    salesCount,
+    firstSaleDate: totals.firstSaleDate,
     revenue: totals.revenue,
     received: totals.received,
     pending: totals.pending,
-    soldCost: totals.cost,
+    soldCost: totals.soldCost,
     giveawayCost: (donatedPackages + lostPackages) * production.costPerPackage,
     missedRevenue: (donatedPackages + lostPackages) * price,
     soldPackages,
     donatedPackages,
     lostPackages,
     availablePackages,
-    outPackages: totals.packages,
-    soldShare: ratio(totals.packages, production.packages),
+    outPackages: totals.outPackages,
+    soldShare: ratio(totals.outPackages, production.packages),
     expectedYield,
     yieldEfficiency: ratio(production.actualYield, expectedYield),
     lossRate: ratio(production.losses, production.actualYield),
@@ -115,7 +94,6 @@ export function buildProductionReport(production: CalculatedProduction, sales: S
     projectedRevenue,
     projectedResult,
     status,
-    daily: buildDailyTimeline(production, linkedSales),
   };
 }
 

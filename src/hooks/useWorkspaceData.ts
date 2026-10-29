@@ -1,34 +1,78 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { SetStateAction } from "react";
 import { toast } from "react-toastify";
 import { isAxiosError } from "axios";
-import type { MarketItem, Recipe, Production, Sale, StockLot, StockEntry, StockCorrection, WorkspaceData } from "../domain/models";
+import type {
+  MarketItem, Recipe, RecipeEdit, Production, Sale, StockEntry, StockCorrection, WorkspaceData, WorkspacePatch, WorkspaceSummary,
+} from "../domain/models";
 import { workspaceService } from "../services/workspace";
+import { recipePatch } from "../domain/recipeEdits";
+import { queryService } from "../services/query";
 import { getApiErrorMessage } from "../services/http";
 
-const emptyData: WorkspaceData = { market: [], recipes: [], productions: [], sales: [] };
+export type DraftKind = "market" | "recipes" | "productions";
 
-// hasStockHistory is server-derived, so it must not count as an unsaved edit.
-const contentKey = ({ market, recipes, productions, sales }: WorkspaceData) =>
-  JSON.stringify({
-    market: market.map((item) => ({ ...item, hasStockHistory: undefined })),
-    recipes, productions, sales,
-  });
+/** Unsaved edits of the current screen, keyed by record id. Nothing else is kept in memory. */
+export type Drafts = {
+  market: Record<string, MarketItem>;
+  recipes: Record<string, RecipeEdit>;
+  productions: Record<string, Production>;
+  deletedMarket: string[];
+  /** Market items created on this screen and not saved yet. */
+  createdMarket: string[];
+};
+
+export type ChangeSet = {
+  market?: MarketItem[];
+  /** Whole recipes (registration and import): their ingredient lists replace the saved ones. */
+  recipes?: Recipe[];
+  productions?: Production[];
+  sales?: Sale[];
+  deleted?: { market?: string[]; recipes?: string[]; productions?: string[]; sales?: string[] };
+};
+
+const emptyDrafts: Drafts = { market: {}, recipes: {}, productions: {}, deletedMarket: [], createdMarket: [] };
+
+const isEmptyDrafts = (drafts: Drafts) =>
+  !Object.keys(drafts.market).length && !Object.keys(drafts.recipes).length &&
+  !Object.keys(drafts.productions).length && !drafts.deletedMarket.length;
+
+const byId = <T extends { id: string }>(...lists: (T[] | undefined)[]) => {
+  const map = new Map<string, T>();
+  for (const list of lists) for (const item of list ?? []) map.set(item.id, item);
+  return [...map.values()];
+};
+
+const unique = (...lists: (string[] | undefined)[]) => [...new Set(lists.flatMap((list) => list ?? []))];
+
+// hasStockHistory is server-derived and must not be sent back as part of an edit.
+const stripMarket = ({ hasStockHistory: _derived, ...item }: MarketItem & { ingredientCount?: number }) => {
+  void _derived;
+  const { ingredientCount: _count, ...rest } = item;
+  void _count;
+  return rest;
+};
+
+const isBlockingError = (error: unknown) =>
+  !isAxiosError(error) || !error.response || error.response.status >= 500 ||
+  error.response.data?.code === "workspace_conflict";
 
 export function useWorkspaceData(userId: string) {
-  const [data, setData] = useState<WorkspaceData>(emptyData);
-  const [stock, setStock] = useState<StockLot[]>([]);
+  const [summary, setSummary] = useState<WorkspaceSummary | null>(null);
+  const [drafts, setDraftsState] = useState<Drafts>(emptyDrafts);
+  const [dataVersion, setDataVersion] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
-  const [canManageStock, setCanManageStock] = useState(false);
+  const [canManage, setCanManage] = useState(false);
   const [apiStatus, setApiStatus] = useState<"connecting" | "saving" | "connected" | "error">("connecting");
-  const latest = useRef(data);
+  const latest = useRef(drafts);
   const revision = useRef<number | undefined>(undefined);
-  const lastSaved = useRef("");
   const queue = useRef(Promise.resolve());
   const active = useRef(true);
   const blocked = useRef(false);
-  const [savedKey, setSavedKey] = useState("");
-  const savedData = useRef<WorkspaceData>(emptyData);
+
+  const setDrafts = useCallback((next: Drafts) => {
+    latest.current = next;
+    setDraftsState(next);
+  }, []);
 
   const enqueue = useCallback(<T,>(action: () => Promise<T>): Promise<T> => {
     const next = queue.current.then(async () => {
@@ -42,8 +86,8 @@ export function useWorkspaceData(userId: string) {
 
   const reportError = useCallback((error: unknown) => {
     if (!active.current) return;
-    blocked.current = !isAxiosError(error) || !error.response || error.response.status >= 500 || error.response.data?.code === "workspace_conflict";
-    if (blocked.current) setCanManageStock(false);
+    blocked.current = isBlockingError(error);
+    if (blocked.current) setCanManage(false);
     setApiStatus("error");
     toast.error(getApiErrorMessage(error, "Não foi possível salvar. As alterações continuam na tela; recarregue para conferir o servidor."), { toastId: "api-save" });
     console.error("Falha na sincronização do workspace.", error);
@@ -54,18 +98,12 @@ export function useWorkspaceData(userId: string) {
     const controller = new AbortController();
     void (async () => {
       try {
-        const server = await workspaceService.load(controller.signal);
-        const lots = await workspaceService.stock(controller.signal);
+        const loaded = await queryService.summary({}, controller.signal);
         if (controller.signal.aborted) return;
-        revision.current = server.revision;
-        lastSaved.current = contentKey(server);
-        setSavedKey(lastSaved.current);
-        savedData.current = server;
-        latest.current = server;
-        setData(server);
-        setStock(lots);
+        revision.current = loaded.revision;
+        setSummary(loaded);
         blocked.current = false;
-        setCanManageStock(true);
+        setCanManage(true);
         setApiStatus("connected");
       } catch (error) {
         if (!controller.signal.aborted) reportError(error);
@@ -79,53 +117,61 @@ export function useWorkspaceData(userId: string) {
     };
   }, [userId, reportError]);
 
-  const persist = useCallback((snapshot: WorkspaceData = latest.current, explicit = false) => enqueue(async () => {
+  /** Reloads the global counts after a write; the revision only advances through our own writes. */
+  const afterWrite = useCallback(async () => {
+    setDataVersion((version) => version + 1);
+    try {
+      const loaded = await queryService.summary();
+      if (active.current) setSummary({ ...loaded, revision: revision.current ?? loaded.revision });
+    } catch (error) {
+      console.error("Falha ao atualizar o resumo.", error);
+      toast.error(getApiErrorMessage(error, "Os dados foram salvos, mas o resumo não pôde ser atualizado."), { toastId: "summary" });
+    }
+  }, []);
+
+  /** Sends the pending edits plus `changes` as one atomic PATCH /data. */
+  const persist = useCallback((changes: ChangeSet) => enqueue(async () => {
     if (blocked.current || revision.current === undefined)
       throw new Error("Recarregue os dados do servidor antes de salvar.");
-    if (!explicit && snapshot !== latest.current) return latest.current;
-    if (contentKey(snapshot) === lastSaved.current) return snapshot;
+    const pending = latest.current;
+    const deletedMarket = unique(pending.deletedMarket, changes.deleted?.market);
+    const edits = Object.values(pending.recipes).filter((edit) => !changes.deleted?.recipes?.includes(edit.recipe.id));
+    const body: WorkspacePatch = {
+      market: byId(Object.values(pending.market), changes.market)
+        .filter((item) => !deletedMarket.includes(item.id)).map(stripMarket),
+      ...recipePatch(edits, changes.recipes),
+      productions: byId(Object.values(pending.productions), changes.productions)
+        .filter((production) => !changes.deleted?.productions?.includes(production.id)),
+      sales: changes.sales ?? [],
+      deleted: {
+        market: deletedMarket,
+        recipes: unique(changes.deleted?.recipes),
+        productions: unique(changes.deleted?.productions),
+        sales: unique(changes.deleted?.sales),
+      },
+      revision: revision.current,
+    };
+    const nothing = !body.market.length && !body.recipes.length && !body.productions.length && !body.sales.length &&
+      !Object.values(body.deleted).some((ids) => ids.length);
+    if (nothing) return null;
     setApiStatus("saving");
-    const server = await workspaceService.save({ ...snapshot, revision: revision.current });
-    revision.current = server.revision;
-    lastSaved.current = contentKey(server);
-    setSavedKey(lastSaved.current);
-    savedData.current = server;
-    if (!active.current) return server;
-    if (contentKey(latest.current) === contentKey(snapshot)) {
-      latest.current = server;
-      setData(server);
-    } else {
-      // Later local edits must not be replaced by an earlier server response.
-      setData((current) => {
-        const productions = [...current.productions];
-        for (const saved of server.productions) {
-          if (
-            snapshot.productions.some((item) => item.id === saved.id) &&
-            !productions.some((item) => item.id === saved.id)
-          ) {
-            productions.unshift(saved);
-          }
-        }
-        const merged = {
-          ...current,
-          productions: productions.map((production) => {
-            const saved = server.productions.find((item) => item.id === production.id);
-            if (explicit && production.quantity === 0 && saved && saved.quantity > 0) return saved;
-            return saved && saved.quantity === production.quantity && saved.recipeId === production.recipeId
-              ? { ...production, totalCost: saved.totalCost, ingredientCostPerBatch: saved.ingredientCostPerBatch }
-              : production;
-          }),
-        };
-        latest.current = merged;
-        return merged;
-      });
-    }
-    setStock(await workspaceService.stock());
+    const saved = await workspaceService.patch(body);
+    revision.current = saved.revision;
+    // Edits made while the request was in flight stay pending.
+    if (latest.current === pending) setDrafts(emptyDrafts);
+    else setDrafts({
+      market: Object.fromEntries(Object.entries(latest.current.market).filter(([id, item]) => pending.market[id] !== item)),
+      recipes: Object.fromEntries(Object.entries(latest.current.recipes).filter(([id, item]) => pending.recipes[id] !== item)),
+      productions: Object.fromEntries(Object.entries(latest.current.productions).filter(([id, item]) => pending.productions[id] !== item)),
+      deletedMarket: latest.current.deletedMarket.filter((id) => !deletedMarket.includes(id)),
+      createdMarket: latest.current.createdMarket.filter((id) => !(id in pending.market)),
+    });
     setApiStatus("connected");
-    return server;
-  }), [enqueue]);
+    await afterWrite();
+    return saved;
+  }), [enqueue, afterWrite, setDrafts]);
 
-  const hasUnsavedChanges = !isLoading && savedKey !== "" && contentKey(data) !== savedKey;
+  const hasUnsavedChanges = !isLoading && !isEmptyDrafts(drafts);
 
   useEffect(() => {
     if (!hasUnsavedChanges) return;
@@ -136,43 +182,57 @@ export function useWorkspaceData(userId: string) {
 
   const saveChanges = async () => {
     try {
-      await persist(latest.current, true);
+      await persist({});
     } catch (error) {
       reportError(error);
       throw error;
     }
   };
 
-  const update = <K extends "market" | "recipes" | "productions" | "sales">(key: K, action: SetStateAction<WorkspaceData[K]>) => {
-    const current = latest.current;
-    const value = typeof action === "function" ? action(current[key]) : action;
-    const next = { ...current, [key]: value };
-    latest.current = next;
-    setData(next);
-  };
-
-  const isDirty = () => contentKey(latest.current) !== lastSaved.current;
-
-  const discardChanges = () => {
-    latest.current = savedData.current;
-    setData(savedData.current);
-  };
-
-  // Applies an explicit, already-confirmed change and persists it right away; rolls back on failure.
-  const commitChange = async (mutate: (current: WorkspaceData) => WorkspaceData) => {
-    const previous = latest.current;
-    const next = mutate(previous);
-    latest.current = next;
-    setData(next);
+  /** Applies an explicit, already-confirmed change and saves it right away. */
+  const commitChange = async (changes: ChangeSet) => {
     try {
-      await persist(next, true);
+      return await persist(changes);
     } catch (error) {
-      latest.current = previous;
-      setData(previous);
       reportError(error);
       throw error;
     }
   };
+
+  const stage = <K extends DraftKind>(kind: K, record: Drafts[K][string], created = false) => {
+    const current = latest.current;
+    const id = "recipe" in record ? record.recipe.id : record.id;
+    setDrafts({
+      ...current, [kind]: { ...current[kind], [id]: record },
+      createdMarket: created ? unique(current.createdMarket, [id]) : current.createdMarket,
+    });
+  };
+
+  const stageMarketDelete = (id: string) => {
+    const current = latest.current;
+    const { [id]: _removed, ...market } = current.market;
+    void _removed;
+    // The server removes saved references to a deleted item; pending rows using it are dropped here.
+    const recipes = Object.fromEntries(Object.entries(current.recipes).map(([recipeId, edit]) => {
+      const removed = edit.recipe.ingredients.filter((ingredient) => ingredient.marketItemId === id).map((ingredient) => ingredient.id);
+      return [recipeId, removed.length ? {
+        ...edit,
+        recipe: { ...edit.recipe, ingredients: edit.recipe.ingredients.filter((ingredient) => !removed.includes(ingredient.id)) },
+        createdIngredients: edit.createdIngredients.filter((ingredientId) => !removed.includes(ingredientId)),
+      } : edit];
+    }));
+    // An item that never reached the server is simply dropped from the pending edits.
+    const created = current.createdMarket.includes(id);
+    setDrafts({
+      ...current, market, recipes,
+      deletedMarket: created ? current.deletedMarket : unique(current.deletedMarket, [id]),
+      createdMarket: current.createdMarket.filter((entry) => entry !== id),
+    });
+  };
+
+  const isDirty = () => !isEmptyDrafts(latest.current);
+  const latestDrafts = () => latest.current;
+  const discardChanges = () => setDrafts(emptyDrafts);
 
   const stockMutation = async (action: (version: number) => Promise<{ revision: number }>) => {
     try {
@@ -180,16 +240,10 @@ export function useWorkspaceData(userId: string) {
         if (blocked.current || revision.current === undefined) throw new Error("Recarregue a página antes de alterar o estoque.");
         setApiStatus("saving");
         const result = await action(revision.current);
+        if (typeof result?.revision !== "number") throw new Error("A API não informou a nova revisão dos dados.");
         revision.current = result.revision;
-        const lots = await workspaceService.stock();
-        setStock(lots);
-        setData((current) => {
-          const itemIds = new Set(lots.map((lot) => lot.marketItemId));
-          const next = { ...current, market: current.market.map((item) => ({ ...item, hasStockHistory: itemIds.has(item.id) })) };
-          latest.current = next;
-          return next;
-        });
         setApiStatus("connected");
+        await afterWrite();
       });
     } catch (error) {
       reportError(error);
@@ -198,18 +252,10 @@ export function useWorkspaceData(userId: string) {
   };
 
   const saveProduction = async (production: Production) => {
-    const exists = latest.current.productions.some((item) => item.id === production.id);
-    const snapshot = {
-      ...latest.current,
-      productions: exists
-        ? latest.current.productions.map((item) => item.id === production.id ? production : item)
-        : [production, ...latest.current.productions],
-    };
     try {
-      await persist(snapshot, true);
+      await persist({ productions: [production] });
     } catch (error) {
-      if (!isAxiosError(error) || !error.response || error.response.status >= 500 || error.response.data?.code === "workspace_conflict")
-        reportError(error);
+      if (isBlockingError(error)) reportError(error);
       // Business rejections keep the draft editable without blocking unrelated work.
       else {
         setApiStatus("connected");
@@ -219,13 +265,14 @@ export function useWorkspaceData(userId: string) {
     }
   };
 
+  /** Explicit bulk read for workbook export/import only. */
+  const loadAll = (): Promise<WorkspaceData> => workspaceService.load();
+
   return {
-    ...data, stock, apiStatus, isLoading, hasUnsavedChanges, saveChanges, isDirty, discardChanges, commitChange,
-    canManageStock: !isLoading && canManageStock,
-    setMarket: (action: SetStateAction<MarketItem[]>) => update("market", action),
-    setRecipes: (action: SetStateAction<Recipe[]>) => update("recipes", action),
-    setProductions: (action: SetStateAction<Production[]>) => update("productions", action),
-    setSales: (action: SetStateAction<Sale[]>) => update("sales", action),
+    summary, drafts, dataVersion, apiStatus, isLoading, hasUnsavedChanges, saveChanges, isDirty, discardChanges,
+    commitChange, stage, stageMarketDelete, loadAll, latestDrafts,
+    canManageStock: !isLoading && canManage,
+    canSave: !isLoading && canManage,
     addStock: (entry: StockEntry) => stockMutation((version) => workspaceService.addStock(entry, version)),
     updateStock: (correction: StockCorrection) => stockMutation((version) => workspaceService.updateStock(correction, version)),
     deleteStock: (id: string) => stockMutation((version) => workspaceService.deleteStock(id, version)),

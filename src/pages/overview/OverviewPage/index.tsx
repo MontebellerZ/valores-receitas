@@ -4,28 +4,34 @@ import IconButton from "../../../components/ui/IconButton";
 import DataTable from "../../../components/ui/DataTable";
 import FormField from "../../../components/ui/FormField";
 import SearchableSelect from "../../../components/ui/SearchableSelect";
+import Pagination from "../../../components/ui/Pagination";
 import styles from "./styles.module.scss";
 import PageHeader from "../../../components/ui/PageHeader";
 import MetricCard, { MetricGrid } from "../../../components/ui/MetricCard";
 import Panel from "../../../components/ui/Panel";
 import PaymentBadge from "../../../components/ui/PaymentBadge";
 import { money, number as count, dateLabel } from "../../../utils/format";
-import {
-  balance,
-  dateKey,
-  periodStart,
-  summarizeSales,
-  type Period,
-} from "../../../domain/overview";
+import { balance, type Period } from "../../../domain/overview";
 import { ArrowRight, Eye, ShoppingBag } from "lucide-react";
-import { useState, type ReactNode } from "react";
-import type { Sale, CalculatedProduction } from "../../../domain/models";
-import { remainingPackages } from "../../../domain/calculations";
+import type { ReactNode } from "react";
+import type { ProductionBalance, Sale, WorkspaceSummary } from "../../../domain/models";
+import type { ListControls } from "../../../hooks/usePagedQuery";
 import logoVertical from "../../../assets/brand/conta-de-chef-vertical.png";
 
+
 type Props = {
-  productions: CalculatedProduction[];
-  sales: Sale[];
+  period: Period;
+  onPeriodChange: (period: Period) => void;
+  /** First and last day of the period (ISO); `start` is empty for "Desde sempre". */
+  range: { start: string; end: string };
+  /** Server totals for the period; `undefined` while loading. */
+  summary?: WorkspaceSummary;
+  summaryStatus: "loading" | "ready" | "error";
+  /** Productions of the period with global sold/available and the sales of the period. */
+  progress: ListControls & { items: ProductionBalance[] };
+  productions: ListControls & { items: ProductionBalance[] };
+  /** Sales of the period, most recent first. */
+  recentSales: ListControls & { items: Sale[] };
   recipeCount: number;
   marketCount: number;
   importAction: ReactNode;
@@ -33,89 +39,48 @@ type Props = {
   onViewProduction: (id?: string) => void;
 };
 
+const emptySummary: WorkspaceSummary = {
+  revision: 0,
+  counts: { market: 0, recipes: 0, productions: 0, sales: 0 },
+  sales: { count: 0, packages: 0, revenue: 0, received: 0, pending: 0, pendingCount: 0, cost: 0, profit: 0 },
+  availablePackages: 0, productionCost: 0, producedPackages: 0, lostPackages: 0,
+  productions: { count: 0, soldPackages: 0, losses: 0, remainingRevenue: 0, remainingCost: 0,
+    expectedRevenue: 0, referenceRevenue: 0, referenceProfit: 0 },
+};
+
 export default function Overview({
+  period,
+  onPeriodChange: setPeriod,
+  range: { start, end },
+  summary: loadedSummary,
+  summaryStatus,
+  progress,
   productions,
-  sales,
+  recentSales: recent,
   recipeCount,
   marketCount,
   importAction,
   onViewSales,
   onViewProduction,
 }: Props) {
-  const [period, setPeriod] = useState<Period>("all");
-  const today = new Date();
-  const end = dateKey(today);
-  const start = periodStart(period, today);
-  const inPeriod = (date: string) =>
-    date ? (!start || date >= start) && date <= end : period === "all";
-  const periodSales = sales.filter((sale) => inPeriod(sale.date));
-  const periodProductions = productions.filter((production) =>
-    inPeriod(production.date),
-  );
-  const actual = summarizeSales(periodSales);
+  const summary = loadedSummary ?? emptySummary;
+  const actual = summary.sales;
   const actualProfit = balance(actual.revenue, actual.cost);
-  const rows = periodProductions
-    .map((production) => {
-      const linkedSales = periodSales.filter(
-        (sale) => sale.productionId === production.id,
-      );
-      const realized = summarizeSales(linkedSales);
-      const soldPackages = sales
-        .filter((sale) => sale.productionId === production.id)
-        .reduce((total, sale) => total + sale.packages, 0);
-      const price = production.expectedSalePrice ?? production.salePrice;
-      const available = remainingPackages(production, soldPackages);
-      return {
-        ...production,
-        realized,
-        soldPackages,
-        hasSales: linkedSales.length > 0,
-        price,
-        available,
-        remainingRevenue: price * available,
-        remainingCost: production.costPerPackage * available,
-      };
-    })
-    .sort((first, second) => second.date.localeCompare(first.date));
-  const planning = rows.reduce(
-    (total, production) => ({
-      packages: total.packages + production.packages,
-      soldPackages: total.soldPackages + production.soldPackages,
-      available: total.available + production.available,
-      cost: total.cost + production.cost,
-      losses: total.losses + production.losses,
-      remainingRevenue: total.remainingRevenue + production.remainingRevenue,
-      remainingCost: total.remainingCost + production.remainingCost,
-      expectedRevenue:
-        total.expectedRevenue + production.price * remainingPackages(production),
-      referenceRevenue: total.referenceRevenue + production.revenue,
-      referenceProfit: total.referenceProfit + production.profit,
-    }),
-    {
-      packages: 0,
-      soldPackages: 0,
-      available: 0,
-      cost: 0,
-      losses: 0,
-      remainingRevenue: 0,
-      remainingCost: 0,
-      expectedRevenue: 0,
-      referenceRevenue: 0,
-      referenceProfit: 0,
-    },
-  );
+  const planning = {
+    packages: summary.producedPackages,
+    available: summary.availablePackages,
+    cost: summary.productionCost,
+    ...summary.productions,
+  };
   const remainingProfit = balance(
     planning.remainingRevenue,
     planning.remainingCost,
   );
-  const recentSales = periodSales
-    .slice()
-    .sort(
-      (first, second) =>
-        second.date.localeCompare(first.date) ||
-        second.id.localeCompare(first.id),
-    )
-    .slice(0, 5);
+  const describe = (production: ProductionBalance) => {
+    const hasSales = production.periodSales.count > 0;
+    const price = production.expectedSalePrice ?? production.salePrice;
+    return { ...production, realized: production.periodSales, hasSales, price, available: production.availablePackages };
+  };
   const soldPercent =
     planning.packages > 0
       ? Math.min(100, (planning.soldPackages / planning.packages) * 100)
@@ -128,7 +93,9 @@ export default function Overview({
         title={<>Visão geral</>}
         eyebrow="SEU NEGÓCIO, EM NÚMEROS"
         eyebrowDot
-        description={`${periodProductions.length} produções · ${periodSales.length} vendas · ${recipeCount} receitas · ${marketCount} insumos`}
+        description={loadedSummary
+          ? `${summary.productions.count} produções · ${summary.sales.count} vendas · ${recipeCount} receitas · ${marketCount} insumos`
+          : summaryStatus === "error" ? "Não foi possível carregar o resumo do período." : "Carregando resumo do período..."}
         action={
           <div className={styles["welcome-actions"]}>
             {importAction}
@@ -160,7 +127,7 @@ export default function Overview({
         </span>
       </div>
 
-      <MetricGrid aria-label="Resultados reais">
+      <MetricGrid aria-label="Resultados reais" aria-busy={summaryStatus === "loading"}>
         <MetricCard
           variant="overview"
           label="Faturamento vendido"
@@ -177,7 +144,7 @@ export default function Overview({
           variant="overview"
           label="A receber"
           value={<>{money(actual.pending)}</>}
-          caption={`${periodSales.filter((sale) => !sale.paid).length} vendas pendentes`}
+          caption={`${count(actual.pendingCount)} vendas pendentes`}
         />
         <MetricCard
           variant="overview"
@@ -201,9 +168,9 @@ export default function Overview({
               Ver produção <ArrowRight size={14} aria-hidden="true" />
             </Button>
           }>
-          {rows.length ? (
-            <div className={styles["overview-production-progress"]}>
-              {rows.slice(0, 6).map((production) => {
+          {progress.items.length ? (
+            <div className={styles["overview-production-progress"]} aria-busy={progress.status === "loading"}>
+              {progress.items.map(describe).map((production) => {
                 const percent =
                   production.packages > 0
                     ? Math.min(
@@ -237,12 +204,15 @@ export default function Overview({
                 );
               })}
             </div>
-          ) : (
+          ) : progress.status === "error" ? (
+            <EmptyState>Não foi possível carregar as produções do período.</EmptyState>
+          ) : progress.status === "ready" && (
             <EmptyState className={styles["overview-empty-brand"]}>
               <img src={logoVertical} alt="" width="548" height="309" />
               <p>Nenhuma produção registrada.</p>
             </EmptyState>
           )}
+          {progress.pagination.totalCount > 0 && <Pagination {...progress.pagination} label="produções" />}
         </Panel>
 
         <Panel variant="plain" className={styles["overview-section"]} title="Planejamento do estoque" action={
@@ -313,8 +283,8 @@ export default function Overview({
             Ver todas <ArrowRight size={14} aria-hidden="true" />
           </Button>
         }>
-        {rows.length ? (
-          <DataTable variant="sales"   ><thead>
+        {productions.items.length ? (
+          <DataTable variant="sales" serverSort={productions.serverSort} aria-busy={productions.status === "loading"}><thead>
                 <tr>
                   <th>Produção</th>
                   <th>Vendidos</th>
@@ -325,7 +295,7 @@ export default function Overview({
                   <th />
                 </tr>
               </thead><tbody>
-                {rows.slice(0, 6).map((production) => {
+                {productions.items.map(describe).map((production) => {
                   const source = production.hasSales
                     ? "Realizado"
                     : production.expectedSalePrice !== undefined
@@ -340,15 +310,13 @@ export default function Overview({
                   const result = balance(revenue, cost);
                   return (
                     <tr key={production.id}>
-                      <td data-sort-value={production.recipeName}>
+                      <td>
                         <strong>{production.recipeName}</strong>
                         <small>{dateLabel(production.date)}</small>
                       </td>
-                      <td data-sort-value={production.realized.packages}>{count(production.realized.packages)}</td>
-                      <td data-sort-value={production.available}>{count(production.available)}</td>
-                      <td data-sort-value={production.hasSales
-                        ? production.realized.packages > 0 ? production.realized.revenue / production.realized.packages : null
-                        : production.price}>
+                      <td>{count(production.realized.packages)}</td>
+                      <td>{count(production.available)}</td>
+                      <td>
                         {production.hasSales
                           ? production.realized.packages > 0
                             ? money(
@@ -365,11 +333,11 @@ export default function Overview({
                               : "Preço sugerido"}
                         </small>
                       </td>
-                      <td data-sort-value={revenue}>
+                      <td>
                         {money(revenue)}
                         <small>{source}</small>
                       </td>
-                      <td data-sort-value={production.hasSales || production.packages > 0 ? result : null}>
+                      <td>
                         <span
                           className={result < 0 ? styles["text-negative"] : undefined}
                         >
@@ -393,9 +361,12 @@ export default function Overview({
                   );
                 })}
               </tbody></DataTable>
-        ) : (
+        ) : productions.status === "error" ? (
+          <EmptyState>Não foi possível carregar as produções do período.</EmptyState>
+        ) : productions.status === "ready" && (
           <EmptyState>Nenhuma produção registrada.</EmptyState>
         )}
+        {productions.pagination.totalCount > 0 && <Pagination {...productions.pagination} label="produções" />}
       </Panel>
 
       <Panel variant="plain" className={styles["overview-section"]} title="Vendas recentes" action={
@@ -403,8 +374,8 @@ export default function Overview({
             Ver vendas <ArrowRight size={14} aria-hidden="true" />
           </Button>
         }>
-        {recentSales.length ? (
-          <DataTable variant="sales"   ><thead>
+        {recent.items.length ? (
+          <DataTable variant="sales" serverSort={recent.serverSort} aria-busy={recent.status === "loading"}><thead>
                 <tr>
                   <th>Venda</th>
                   <th>Cliente</th>
@@ -413,24 +384,27 @@ export default function Overview({
                   <th>Pagamento</th>
                 </tr>
               </thead><tbody>
-                {recentSales.map((sale) => (
+                {recent.items.map((sale) => (
                   <tr key={sale.id}>
-                    <td data-sort-value={sale.recipeName}>
+                    <td>
                       <strong>{sale.recipeName}</strong>
                       <small>{dateLabel(sale.date)}</small>
                     </td>
-                    <td data-sort-value={sale.customer}>{sale.customer || "—"}</td>
-                    <td data-sort-value={sale.packages}>{count(sale.packages)}</td>
-                    <td data-sort-value={sale.packages * sale.pricePerPackage}>{money(sale.packages * sale.pricePerPackage)}</td>
-                    <td data-sort-value={Number(sale.paid)}>
+                    <td>{sale.customer || "—"}</td>
+                    <td>{count(sale.packages)}</td>
+                    <td>{money(sale.packages * sale.pricePerPackage)}</td>
+                    <td>
                       <PaymentBadge paid={sale.paid} donated={sale.donated} />
                     </td>
                   </tr>
                 ))}
               </tbody></DataTable>
-        ) : (
+        ) : recent.status === "error" ? (
+          <EmptyState>Não foi possível carregar as vendas do período.</EmptyState>
+        ) : recent.status === "ready" && (
           <EmptyState>Nenhuma venda registrada.</EmptyState>
         )}
+        {recent.pagination.totalCount > 0 && <Pagination {...recent.pagination} label="vendas" />}
       </Panel>
     </div>
   );

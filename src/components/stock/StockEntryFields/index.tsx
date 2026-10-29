@@ -1,22 +1,28 @@
 import type { ReactNode } from "react";
-import type { MarketItem, StockEntry, StockField } from "../../../domain/models";
+import type { MarketListItem, StockEntry, StockField } from "../../../domain/models";
+import { queryService } from "../../../services/query";
 import FormField from "../../ui/FormField";
 import FormControl from "../../ui/FormControl";
 import { FormGrid } from "../../ui/FormLayout";
-import SearchableSelect from "../../ui/SearchableSelect";
+import RemoteSelect from "../../ui/RemoteSelect";
 import styles from "./styles.module.scss";
+
+export type StockItemRef = { id: string; name: string; unit: string };
 
 type Props = {
   value: StockEntry;
-  market: MarketItem[];
+  /** Name and unit of the chosen market item, kept by the parent because options are loaded on demand. */
+  selectedItem?: StockItemRef;
   disabled?: boolean;
-  onChange: (patch: Partial<StockEntry>) => void;
+  onChange: (patch: Partial<StockEntry>, item?: StockItemRef) => void;
   enabledFields?: Record<StockField, boolean>;
   onToggleField?: (field: StockField, enabled: boolean) => void;
 };
 
-export default function StockEntryFields({ value, market, disabled, onChange, enabledFields, onToggleField }: Props) {
-  const item = market.find((item) => item.id === value.marketItemId);
+const label = (item: StockItemRef) => `${item.name || "Insumo sem nome"} (${item.unit})`;
+
+export default function StockEntryFields({ value, selectedItem, disabled, onChange, enabledFields, onToggleField }: Props) {
+  const item = selectedItem?.id === value.marketItemId ? selectedItem : undefined;
   const enabled = (field: StockField) => !disabled && (!enabledFields || enabledFields[field]);
   const field = (key: StockField, label: string, control: ReactNode) => <div className={styles.field}>
     {enabledFields && <FormField variant="inline" label={`Alterar ${label.toLocaleLowerCase("pt-BR")}`}><input type="checkbox" checked={enabledFields[key]}
@@ -24,9 +30,10 @@ export default function StockEntryFields({ value, market, disabled, onChange, en
     <FormField label={label}>{control}</FormField>
   </div>;
   return <FormGrid variant="wrap">
-    {field("marketItemId", "Insumo", <SearchableSelect required disabled={!enabled("marketItemId")} value={value.marketItemId}
-      placeholder="Selecione um insumo" options={market.map((item) => ({ value: item.id, label: `${item.name || "Insumo sem nome"} (${item.unit})` }))}
-      onChange={(marketItemId) => onChange({ marketItemId })} />)}
+    {field("marketItemId", "Insumo", <RemoteSelect required disabled={!enabled("marketItemId")} value={value.marketItemId}
+      placeholder="Selecione um insumo" selectedLabel={item && label(item)}
+      fetcher={queryService.market} sortBy="name" toOption={(entry: MarketListItem) => ({ value: entry.id, label: label(entry) })}
+      onChange={(marketItemId, entry) => onChange({ marketItemId }, entry && { id: entry.id, name: entry.name, unit: entry.unit })} />)}
     {field("entryDate", "Data da compra", <FormControl autoFocus={!enabledFields} type="date" required disabled={!enabled("entryDate")}
       value={value.entryDate} onChange={(event) => onChange({ entryDate: event.target.value })} />)}
     {value.packageCount !== undefined && <FormField label="Quantidade de pacotes"><FormControl required disabled={disabled}

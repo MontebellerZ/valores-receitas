@@ -17,6 +17,15 @@ after(async () => { await server?.close(); });
 const load = (name) => server.ssrLoadModule(`/src/components/${name}/index.tsx`);
 const render = (Component, props) => renderToStaticMarkup(createElement(Component, props));
 const children = (element) => [element?.props?.children].flat(Infinity).filter(Boolean);
+/** Calls a hook-based component inside a real render so its returned element tree can be inspected. */
+function capture(Component, props) {
+  let tree;
+  renderToStaticMarkup(createElement(function Capture() {
+    tree = Component(props);
+    return tree;
+  }));
+  return tree;
+}
 function descendants(element) {
   return [element, ...children(element).flatMap(descendants)];
 }
@@ -77,14 +86,23 @@ test("stock deletion reuses the confirmation dialog and blocks dismissal while s
   assert.equal(confirmations, 1);
 });
 
+const listControls = (items) => ({
+  items,
+  pagination: { page: 1, pageSize: 10, totalCount: items.length, totalPages: 1, busy: false,
+    onPageChange() {}, onPageSizeChange() {} },
+  serverSort: { columns: {}, descending: false, onSort() {} },
+  status: "ready",
+});
+
 test("stock rows use accessible icon actions and only offer joint editing for original purchases", async () => {
   const { default: StockPage } = await server.ssrLoadModule("/src/pages/stock/StockPage/index.tsx");
   const base = { marketItemId: "flour", itemName: "Farinha", unit: "g", entryDate: "2026-10-20",
-    packageQty: 1000, packagePrice: 10, remainingQty: 1000, isActive: true };
-  const stock = [{ ...base, id: "one", entryOrder: 2 }, { ...base, id: "two", entryOrder: 2 },
-    { ...base, id: "empty", entryOrder: 2, remainingQty: 0, isActive: false },
-    { ...base, id: "other", entryOrder: 3 }];
-  const props = { market: [{ id: "flour", name: "Farinha", unit: "g" }], stock, disabled: false,
+    packageQty: 1000, packagePrice: 10, remainingQty: 1000, isActive: true, purchaseMixedItems: false };
+  const stock = [{ ...base, id: "one", entryOrder: 2, purchaseLotCount: 3 }, { ...base, id: "two", entryOrder: 2, purchaseLotCount: 3 },
+    { ...base, id: "empty", entryOrder: 2, remainingQty: 0, isActive: false, purchaseLotCount: 3 },
+    { ...base, id: "other", entryOrder: 3, purchaseLotCount: 1 }];
+  const props = { lots: listControls(stock), totals: listControls([]), marketCount: 1, search: "", onSearch() {},
+    showInactive: false, onShowInactive() {}, loadPurchase: async () => [], disabled: false,
     addStock: async () => {}, adjustStock: async () => {}, updateStock: async () => {}, deleteStock: async () => {} };
   const html = render(StockPage, props);
   assert.equal((html.match(/type="checkbox"/g) ?? []).length, 1);
@@ -94,9 +112,10 @@ test("stock rows use accessible icon actions and only offer joint editing for or
   for (const action of ["Editar pacote one", "Dar baixa no pacote one", "Excluir pacote one"]) {
     assert.ok(html.includes(`aria-label="${action}"`));
   }
+  assert.match(html, /aria-label="Dar baixa no pacote empty"[^>]*disabled=""/);
   assert.match(html, /title="Excluir pacote"[^>]*><svg/);
-  const mixed = render(StockPage, { ...props, stock: stock.map((lot) =>
-    lot.id === "two" ? { ...lot, marketItemId: "butter", itemName: "Manteiga" } : lot) });
+  const mixed = render(StockPage, { ...props, lots: listControls(stock.map((lot) =>
+    lot.entryOrder === 2 ? { ...lot, purchaseMixedItems: true } : lot)) });
   assert.match(mixed, /title="Compra com insumos diferentes: edite cada pacote individualmente" disabled=""/);
 });
 
@@ -104,26 +123,28 @@ test("shared production fields recalculate yields and preserve immutable saved f
   const { default: ProductionFields } = await load("production/ProductionFields");
   for (const variant of ["default", "registration"]) {
     const patches = [];
-    const fields = ProductionFields({ value: production, recipes, variant, onChange: (patch) => patches.push(patch) });
+    const fields = ProductionFields({ value: production, variant, onChange: (patch) => patches.push(patch) });
     const field = (label) => children(fields).find((child) => child.props.label === label);
-    children(field("Receita"))[0].props.onChange("b");
+    const recipeSelect = children(field("Receita"))[0];
+    assert.equal(recipeSelect.props.selectedLabel, "Cookies");
+    recipeSelect.props.onChange("b", recipes[1]);
     assert.deepEqual(patches.pop(), { recipeId: "b", recipeName: "Bolo", yieldPerBatch: 12, actualYield: 24 });
     children(field("Quantidade de lotes"))[0].props.onChange({ target: { value: "3.5" } });
     assert.deepEqual(patches.pop(), { quantity: 3.5, actualYield: 105 });
     assert.equal(children(field("Perdas"))[0].props.max, 60);
     assert.equal(children(field("Quantidade por pacote"))[0].props.min, "0.0001");
-    const html = render(ProductionFields, { value: production, recipes, variant, locked: true, onChange() {} });
+    const html = render(ProductionFields, { value: production, variant, locked: true, onChange() {} });
     assert.match(html, /role="combobox"[^>]*disabled=""/);
     assert.match(html, /disabled=""[^>]*type="number"[^>]*min="0.0001"/);
   }
   const patches = [];
-  const locked = ProductionFields({ value: production, recipes, locked: true, onChange: (patch) => patches.push(patch) });
+  const locked = ProductionFields({ value: production, locked: true, onChange: (patch) => patches.push(patch) });
   const recipe = children(locked).find((field) => field.props.label === "Receita");
   const quantity = children(locked).find((field) => field.props.label === "Quantidade de lotes");
-  children(recipe)[0].props.onChange("b");
+  children(recipe)[0].props.onChange("b", recipes[1]);
   children(quantity)[0].props.onChange({ target: { value: "9" } });
   assert.deepEqual(patches, []);
-  assert.match(render(ProductionFields, { value: production, recipes: [], locked: true, onChange() {} }), /Cookies \(ficha removida\)/);
+  assert.match(render(ProductionFields, { value: production, locked: true, onChange() {} }), /Cookies/);
 });
 
 test("recipe fields share constraints and changes across registration and detail", async () => {
@@ -144,32 +165,47 @@ test("recipe fields share constraints and changes across registration and detail
 
 test("ingredient editor prevents duplicate choices and delegates updates, additions and removals", async () => {
   const { default: Editor } = await load("recipes/RecipeIngredientsEditor");
-  const market = [{ id: "z", name: "Sal", unit: "g" }, { id: "a", name: "Farinha", unit: "g" }];
   const changes = [];
   const removals = [];
   let additions = 0;
+  const rows = [{ id: "one", marketItemId: "z", quantity: 2 }, { id: "two", marketItemId: "a", quantity: 100 }];
+  const paging = (totalCount) => ({ page: 1, pageSize: 10, totalCount, totalPages: Math.ceil(totalCount / 10), busy: false,
+    onPageChange: () => {}, onPageSizeChange: () => {} });
   const props = {
-    ingredients: [{ id: "one", marketItemId: "z", quantity: 2 }, { id: "two", marketItemId: "a", quantity: 100 }],
-    market, onChange: (...args) => changes.push(args), onRemove: (index) => removals.push(index), onAdd: () => additions++,
+    rows, totalCount: 2, selectedIds: ["z", "a"], hasEmptyRow: false, pagination: paging(2),
+    serverSort: { columns: { 0: "name", 1: "quantity", 2: "unit" }, descending: false, onSort: () => {} },
+    marketCount: 2, onChange: (...args) => changes.push(args), onRemove: (index) => removals.push(index), onAdd: () => additions++,
   };
-  const editor = Editor(props);
-  assert.equal(editor.props.action.props.disabled, true);
+  const addButton = (element) => element.props.action.props.children.at(-1);
+  const editor = capture(Editor, props);
+  assert.equal(addButton(editor).props.disabled, true);
   const nodes = descendants(editor);
   const selects = nodes.filter((node) => node?.props?.["aria-label"] === "Pesquisar insumo");
-  assert.deepEqual(selects[0].props.options.map((option) => option.value), ["a", "z"]);
-  assert.equal(selects[0].props.options.find((option) => option.value === "a").disabled, true);
-  assert.equal(selects[0].props.options.find((option) => option.value === "z").disabled, false);
-  selects[0].props.onChange("z");
-  assert.deepEqual(changes.pop(), [0, { marketItemId: "z" }]);
+  assert.deepEqual(selects[0].props.disabledValues, ["z", "a"]);
+  selects[0].props.onChange("b", { id: "b", name: "Açúcar", unit: "g", ingredientCount: 0 });
+  assert.deepEqual(changes.pop(), [0, { marketItemId: "b" }]);
   nodes.find((node) => node?.props?.["aria-label"] === "Quantidade usada por lote").props.onChange({ target: { value: "3.5" } });
   assert.deepEqual(changes.pop(), [0, { quantity: 3.5 }]);
   nodes.find((node) => node?.props?.["aria-label"] === "Remover ingrediente").props.onClick();
   assert.deepEqual(removals, [0]);
-  const available = Editor({ ...props, ingredients: props.ingredients.slice(0, 1) });
-  assert.equal(available.props.action.props.disabled, false);
-  available.props.action.props.onClick();
+  const available = capture(Editor, { ...props, marketCount: 3 });
+  assert.equal(addButton(available).props.disabled, false);
+  addButton(available).props.onClick();
   assert.equal(additions, 1);
-  assert.match(render(Editor, { ...props, ingredients: [], market: [] }), /Cadastre insumos primeiro/);
+  const withEmptyRow = capture(Editor, { ...props, marketCount: 3, hasEmptyRow: true });
+  assert.equal(addButton(withEmptyRow).props.disabled, true);
+  // The whole recipe counts, not only the loaded page: 32 ingredients use every market item.
+  assert.equal(addButton(capture(Editor, { ...props, marketCount: 32, totalCount: 32 })).props.disabled, true);
+  assert.match(render(Editor, { ...props, rows: [], totalCount: 0, pagination: paging(0), marketCount: 0 }), /Cadastre insumos primeiro/);
+  assert.match(render(Editor, { ...props, rows: [], status: "loading" }), /Carregando ingredientes/);
+  // Rows come already paged by the server; the pager reflects the server total.
+  const paged = render(Editor, { ...props, totalCount: 32, pagination: paging(32), marketCount: 40 });
+  assert.equal((paged.match(/aria-label="Quantidade usada por lote"/g) ?? []).length, 2);
+  assert.match(paged, /32 ingredientes/);
+  assert.ok(!render(Editor, props).includes("ingredientes</span>"));
+  const searched = capture(Editor, { ...props, search: "fa", onSearch: (value) => changes.push(["search", value]) });
+  searched.props.action.props.children[0].props.onChange({ target: { value: "farinha" } });
+  assert.deepEqual(changes.pop(), ["search", "farinha"]);
 });
 
 test("form layout owns disabled fieldsets and shared grids preserve native submission", async () => {
@@ -229,11 +265,11 @@ test("busy registration dialogs disable close and expose their pending state", a
 
 test("standalone production asks for a manual total cost and split button offers both registrations", async () => {
   const { default: Fields } = await load("production/ProductionFields");
-  assert.doesNotMatch(render(Fields, { value: production, recipes, onChange: () => {} }), /Custo total da produção/);
+  assert.doesNotMatch(render(Fields, { value: production, onChange: () => {} }), /Custo total da produção/);
   const changes = [];
   const standalone = { ...production, isStandalone: true, totalCost: null };
-  assert.match(render(Fields, { value: standalone, recipes, onChange: () => {} }), /Custo total da produção/);
-  const cost = descendants(Fields({ value: standalone, recipes, onChange: (patch) => changes.push(patch) }))
+  assert.match(render(Fields, { value: standalone, onChange: () => {} }), /Custo total da produção/);
+  const cost = descendants(Fields({ value: standalone, onChange: (patch) => changes.push(patch) }))
     .find((node) => node?.props?.step === "0.01" && node.props.value === "");
   assert.equal(cost.props.required, true);
   cost.props.onChange({ target: { value: "42.5" } });

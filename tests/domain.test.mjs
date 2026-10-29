@@ -73,6 +73,8 @@ after(async () => {
   await server?.close();
 });
 
+const target = (calculated, soldPackages = 0) => ({ production: calculated, soldPackages });
+
 test("sales cart preserves independent data and historical costs with unique sale identifiers", () => {
   const calculated = calculations.calculateProduction(production);
   const other = { ...calculated, id: "other-production", recipeName: "Bolo", costPerPackage: 7 };
@@ -80,7 +82,7 @@ test("sales cart preserves independent data and historical costs with unique sal
     draft,
     { ...draft, productionId: other.id, date: "2026-10-18", packages: 1,
       pricePerPackage: 12.5, customer: "Outro cliente", paid: false, notes: "Entregar amanhã" },
-  ], [calculated, other], []);
+  ], [target(calculated), target(other)]);
   assert.equal(result.error, undefined);
   assert.equal(result.sales.length, 2);
   assert.notEqual(result.sales[0].id, result.sales[1].id);
@@ -94,38 +96,35 @@ test("sales cart preserves independent data and historical costs with unique sal
 
 test("donated sales are free, never pending and keep consuming packages", () => {
   const calculated = calculations.calculateProduction(production);
-  const donated = rules.prepareSale({ ...draft, donated: true, paid: false, pricePerPackage: 9 }, [calculated], []).sale;
+  const donated = rules.prepareSale({ ...draft, donated: true, paid: false, pricePerPackage: 9 }, calculated, 0).sale;
   assert.equal(donated.donated, true);
   assert.equal(donated.paid, true);
   assert.equal(donated.pricePerPackage, 0);
   assert.equal(donated.packages, draft.packages);
-  assert.equal(rules.prepareSale(draft, [calculated], []).sale.donated, false);
+  assert.equal(rules.prepareSale(draft, calculated, 0).sale.donated, false);
 });
 
-test("sales cart validates combined packages against existing sales without partial results", () => {
+test("sales cart validates combined packages against the server sold total without partial results", () => {
   const calculated = calculations.calculateProduction(production);
-  const existing = rules.prepareSale({ ...draft, packages: 1 }, [calculated], []).sale;
-  const sales = [existing];
   const drafts = [draft, { ...draft, packages: 3 }];
-  const valid = rules.prepareSales(drafts, [calculated], sales);
+  const valid = rules.prepareSales(drafts, [target(calculated, 1)]);
   assert.equal(valid.error, undefined);
-  assert.equal(valid.sales.reduce((sum, sale) => sum + sale.packages, existing.packages), calculated.packages);
-  const invalid = rules.prepareSales([draft, { ...draft, packages: 4 }], [calculated], sales);
+  assert.equal(valid.sales.reduce((sum, sale) => sum + sale.packages, 1), calculated.packages);
+  const invalid = rules.prepareSales([draft, { ...draft, packages: 4 }], [target(calculated, 1)]);
   assert.match(invalid.error, /Venda 2:.*apenas 3 pacotes/);
   assert.equal(invalid.sales, undefined);
-  assert.deepEqual(sales, [existing]);
   assert.deepEqual(drafts, [draft, { ...draft, packages: 3 }]);
 });
 
 test("sales cart rejects empty carts, editing and invalid individual fields", () => {
   const calculated = calculations.calculateProduction(production);
-  assert.match(rules.prepareSales([], [calculated], []).error, /pelo menos uma venda/);
-  assert.match(rules.prepareSales([{ ...draft, id: "existing" }], [calculated], []).error, /novas vendas/);
+  assert.match(rules.prepareSales([], [target(calculated)]).error, /pelo menos uma venda/);
+  assert.match(rules.prepareSales([{ ...draft, id: "existing" }], [target(calculated)]).error, /novas vendas/);
   for (const patch of [
     { productionId: "missing" }, { packages: 1.5 }, { packages: 0 },
     { pricePerPackage: -1 }, { pricePerPackage: NaN }, { date: "2026-10-15" },
   ]) {
-    const result = rules.prepareSales([draft, { ...draft, ...patch }], [calculated], []);
+    const result = rules.prepareSales([draft, { ...draft, ...patch }], [target(calculated)]);
     assert.match(result.error, /^Venda 2:/);
     assert.equal(result.sales, undefined);
   }
@@ -180,7 +179,7 @@ test("recipe and production costs retain yields, losses and markup", () => {
 
 test("sales reject invalid dates, stock, prices and missing productions", () => {
   const calculated = calculations.calculateProduction(production);
-  assert.ok(rules.prepareSale(draft, [calculated], []).sale);
+  assert.ok(rules.prepareSale(draft, calculated, 0).sale);
   for (const patch of [
     { packages: 7 },
     { packages: 0.5 },
@@ -188,25 +187,26 @@ test("sales reject invalid dates, stock, prices and missing productions", () => 
     { date: "2026-10-15" },
     { productionId: "missing" },
   ]) {
-    assert.ok(
-      rules.prepareSale({ ...draft, ...patch }, [calculated], []).error,
-    );
+    assert.ok(rules.prepareSale({ ...draft, ...patch }, calculated, 0).error);
   }
+  assert.ok(rules.prepareSale(draft, null, 0).error);
+  assert.match(rules.prepareSale({ ...draft, packages: 2 }, calculated, 5).error, /apenas 1 pacotes/);
 });
 
 test("editing a sale keeps historical cost and excludes its own stock", () => {
   const calculated = calculations.calculateProduction(production);
-  const created = rules.prepareSale(draft, [calculated], []).sale;
+  const created = rules.prepareSale(draft, calculated, 0).sale;
   const historical = { ...created, id: "sale-test", costPerPackage: 1.25 };
-  const edited = rules.prepareSale(
-    { ...draft, id: historical.id, packages: 6 },
-    [calculated],
-    [historical],
-  );
+  // Sold by others excludes the edited sale, so all six packages remain available to it.
+  const edited = rules.prepareSale({ ...draft, id: historical.id, packages: 6 }, calculated, 0, historical);
   assert.equal(edited.sale.id, historical.id);
   assert.equal(edited.sale.costPerPackage, 1.25);
   assert.equal(edited.sale.productionDate, historical.productionDate);
+  assert.match(rules.prepareSale({ ...draft, id: "missing" }, calculated, 0, historical).error, /não está mais disponível/);
 });
+
+const stats = (soldPackages, firstSaleDate = production.date) =>
+  ({ salesCount: soldPackages > 0 ? 1 : 0, soldPackages, firstSaleDate: soldPackages > 0 ? firstSaleDate : null });
 
 test("lost packages reduce sellable stock and forecast without changing cost per package", () => {
   const calculated = calculations.calculateProduction({ ...production, lostPackages: 2 });
@@ -216,27 +216,23 @@ test("lost packages reduce sellable stock and forecast without changing cost per
   assert.equal(calculations.remainingPackages(calculated, 3), 1);
   assert.equal(calculated.revenue, 10);
   assert.equal(calculated.profit, 0);
-  assert.ok(rules.prepareSale({ ...draft, packages: 4 }, [calculated], []).sale);
-  assert.match(rules.prepareSale({ ...draft, packages: 5 }, [calculated], []).error, /apenas 4 pacotes/);
+  assert.ok(rules.prepareSale({ ...draft, packages: 4 }, calculated, 0).sale);
+  assert.match(rules.prepareSale({ ...draft, packages: 5 }, calculated, 0).error, /apenas 4 pacotes/);
 
-  const sale = rules.prepareSale({ ...draft, packages: 3 }, [calculations.calculateProduction(production)], []).sale;
-  assert.equal(rules.validateProductionUpdate(production, { lostPackages: 3 }, [sale]), undefined);
+  assert.equal(rules.validateProductionUpdate(production, { lostPackages: 3 }, stats(3)), undefined);
   for (const lostPackages of [4, -1, 1.5]) {
-    assert.ok(rules.validateProductionUpdate(production, { lostPackages }, [sale]));
+    assert.ok(rules.validateProductionUpdate(production, { lostPackages }, stats(3)));
   }
 });
 
-test("production report summarizes package destinations, yield and financial results", () => {
+const totals = {
+  salesCount: 3, outPackages: 4, donatedPackages: 1, revenue: 10, received: 6, pending: 4,
+  soldCost: 0, firstSaleDate: "2026-10-16",
+};
+
+test("production report summarizes server totals into package destinations, yield and financial results", () => {
   const calculated = calculations.calculateProduction({ ...production, lostPackages: 1 });
-  const base = { productionId: production.id, productionDate: production.date, recipeName: production.recipeName,
-    date: production.date, costPerPackage: calculated.costPerPackage, customer: "", notes: "" };
-  const sales = [
-    { ...base, id: "paid", packages: 2, pricePerPackage: 3, paid: true },
-    { ...base, id: "gift", packages: 1, pricePerPackage: 0, paid: true, donated: true },
-    { ...base, id: "pending", packages: 1, pricePerPackage: 4, paid: false },
-    { ...base, id: "other", productionId: "other", packages: 5, pricePerPackage: 9, paid: true },
-  ];
-  const report = productionReport.buildProductionReport(calculated, sales);
+  const report = productionReport.buildProductionReport(calculated, totals);
   assert.equal(report.salesCount, 3);
   assert.deepEqual([report.soldPackages, report.donatedPackages, report.lostPackages, report.availablePackages], [3, 1, 1, 1]);
   assert.deepEqual([report.revenue, report.received, report.pending], [10, 6, 4]);
@@ -253,28 +249,20 @@ test("production report summarizes package destinations, yield and financial res
   assert.ok(Math.abs(report.expectedRevenue - 6 * calculated.salePrice) < 1e-9);
   assert.ok(Math.abs(report.revenueGap - (10 - 6 * calculated.salePrice)) < 1e-9);
   assert.ok(Math.abs(report.profitGap - (0 - report.expectedProfit)) < 1e-9);
-  assert.equal(productionReport.buildProductionReport(calculated, []).status, "waiting");
-  assert.equal(productionReport.buildProductionReport({ ...calculated, lostPackages: 6 }, []).status, "closed");
+  const empty = { ...totals, salesCount: 0, outPackages: 0, donatedPackages: 0, revenue: 0, received: 0, pending: 0, firstSaleDate: null };
+  assert.equal(productionReport.buildProductionReport(calculated, empty).status, "waiting");
+  assert.equal(productionReport.buildProductionReport({ ...calculated, lostPackages: 6 }, empty).status, "closed");
 });
 
-test("production report builds a continuous daily timeline and expiration date", () => {
-  const calculated = calculations.calculateProduction(production);
-  const base = { productionId: production.id, productionDate: production.date, recipeName: production.recipeName,
-    costPerPackage: calculated.costPerPackage, customer: "", notes: "", paid: true };
-  const sales = [
-    { ...base, id: "a", date: "2026-10-18", packages: 2, pricePerPackage: 3 },
-    { ...base, id: "b", date: "2026-10-18", packages: 1, pricePerPackage: 0, donated: true },
-    { ...base, id: "c", date: "2026-10-17", packages: 1, pricePerPackage: 4 },
-  ];
-  const daily = productionReport.buildProductionReport(calculated, sales).daily;
-  assert.deepEqual(daily.map((day) => [day.date, day.sold, day.donated, day.total, day.revenue]), [
-    ["2026-10-16", 0, 0, 0, 0],
-    ["2026-10-17", 1, 0, 1, 4],
-    ["2026-10-18", 2, 1, 3, 6],
-  ]);
-  assert.deepEqual(daily.map((day) => day.result), [-calculated.cost, 4 - calculated.cost, 10 - calculated.cost]);
-  assert.deepEqual(productionReport.buildProductionReport(calculated, []).daily, []);
-  const longGap = productionReport.buildDailyTimeline(calculated, [{ ...sales[0], date: "2027-03-01" }]);
+test("daily report pages keep the server accumulated revenue, fill short gaps and compute expiration", () => {
+  const row = (date, sold, revenue, cumulativeRevenue) =>
+    ({ date, sold, donated: 0, total: sold, revenue, cumulativeRevenue });
+  // A middle page: accumulated revenue already includes the previous pages.
+  const filled = productionReport.fillDailyGaps([row("2026-10-18", 2, 6, 40), row("2026-10-16", 1, 4, 34)]);
+  assert.deepEqual(filled.map((day) => [day.date, day.total, day.cumulativeRevenue]),
+    [["2026-10-16", 1, 34], ["2026-10-17", 0, 34], ["2026-10-18", 2, 40]]);
+  assert.deepEqual(productionReport.fillDailyGaps([]), []);
+  const longGap = productionReport.fillDailyGaps([row("2026-10-16", 1, 1, 1), row("2027-03-01", 1, 1, 2)]);
   assert.deepEqual(longGap.map((day) => day.date), ["2026-10-16", "2027-03-01"]);
   assert.equal(productionReport.expirationDate("2026-10-16", 20), "2026-11-05");
   assert.equal(productionReport.expirationDate("2026-10-16", 0), "2026-10-16");
@@ -282,20 +270,15 @@ test("production report builds a continuous daily timeline and expiration date",
 });
 
 test("production changes cannot invalidate existing sales", () => {
-  const calculated = calculations.calculateProduction(production);
-  const sale = rules.prepareSale(draft, [calculated], []).sale;
   for (const patch of [
     { packageQty: 2 },
     { recipeId: "other" },
     { actualYield: 3 },
     { date: "2026-10-17" },
   ]) {
-    assert.ok(rules.validateProductionUpdate(production, patch, [sale]));
+    assert.ok(rules.validateProductionUpdate(production, patch, stats(2)));
   }
-  assert.equal(
-    rules.validateProductionUpdate(production, { margin: 80 }, [sale]),
-    undefined,
-  );
+  assert.equal(rules.validateProductionUpdate(production, { margin: 80 }, stats(2)), undefined);
 });
 
 test("financial summaries and periods retain their results", () => {
@@ -305,21 +288,6 @@ test("financial summaries and periods retain their results", () => {
     "2026-10-10",
   );
   assert.equal(overview.periodStart("all", new Date(2026, 9, 16)), "");
-  const sale = {
-    ...rules.prepareSale(
-      draft,
-      [calculations.calculateProduction(production)],
-      [],
-    ).sale,
-    costPerPackage: 1.25,
-  };
-  assert.deepEqual(overview.summarizeSales([sale]), {
-    packages: 2,
-    revenue: 6,
-    received: 6,
-    pending: 0,
-    cost: 2.5,
-  });
 });
 
 test("storage keeps account caches separate and handles invalid JSON", () => {

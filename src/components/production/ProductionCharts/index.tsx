@@ -1,4 +1,4 @@
-import { useId } from "react";
+import { useId, type ReactNode } from "react";
 import type { ProductionDay } from "../../../domain/productionReport";
 import { dateLabel, money, number } from "../../../utils/format";
 import Panel from "../../ui/Panel";
@@ -77,9 +77,14 @@ function DailyOutflowChart({ days }: { days: ProductionDay[] }) {
   </figure>;
 }
 
-function ResultEvolutionChart({ days, cost, productionDate }: { days: ProductionDay[]; cost: number; productionDate: string }) {
+function ResultEvolutionChart({ days, cost, productionDate, includeStart }: {
+  days: ProductionDay[]; cost: number; productionDate: string; includeStart: boolean;
+}) {
   const gradientId = useId().replace(/:/g, "");
-  const points = [{ date: productionDate || days[0].date, result: -cost, start: true }, ...days.map((day) => ({ ...day, start: false }))];
+  const points = [
+    ...(includeStart ? [{ date: productionDate || days[0].date, result: -cost, start: true }] : []),
+    ...days.map((day) => ({ ...day, result: day.cumulativeRevenue - cost, start: false })),
+  ];
   const values = points.map((point) => point.result);
   const scale = ticks(Math.min(0, ...values), Math.max(0, ...values));
   const y = (value: number) => PAD.top + PLOT_H - ((value - scale.low) / (scale.high - scale.low)) * PLOT_H;
@@ -88,9 +93,13 @@ function ResultEvolutionChart({ days, cost, productionDate }: { days: Production
   const zeroOffset = Math.min(1, Math.max(0, (zero - PAD.top) / PLOT_H));
   const path = points.map((point, index) => `${index ? "L" : "M"}${x(index).toFixed(1)},${y(point.result).toFixed(1)}`).join(" ");
   const area = `${path} L${x(points.length - 1).toFixed(1)},${zero.toFixed(1)} L${x(0).toFixed(1)},${zero.toFixed(1)} Z`;
-  const breakEven = points.findIndex((point) => !point.start && point.result >= 0);
+  // Only a crossing inside the visible points has a date; an earlier page may already have recovered the cost.
+  const breakEven = points.findIndex((point, index) => index > 0 && !point.start && point.result >= 0 && points[index - 1].result < 0);
   const final = points[points.length - 1].result;
   const every = labelEvery(points.length);
+  const recovery = breakEven > 0 ? ` Custo recuperado em ${dateLabel(points[breakEven].date)}.`
+    : final < 0 ? " O custo ainda não foi recuperado."
+      : includeStart ? " A produção não teve custo a recuperar." : " Custo recuperado antes deste período.";
 
   return <figure className={styles.chart}>
     <figcaption>
@@ -98,7 +107,7 @@ function ResultEvolutionChart({ days, cost, productionDate }: { days: Production
       <p>Começa no custo da produção e sobe a cada dia conforme o faturamento das vendas.</p>
     </figcaption>
     <svg viewBox={`0 0 ${WIDTH} ${HEIGHT}`} role="img"
-      aria-label={`Evolução do resultado: começa em ${money(-cost)} e chega a ${money(final)}.${breakEven > 0 ? ` Custo recuperado em ${dateLabel(points[breakEven].date)}.` : " O custo ainda não foi recuperado."}`}>
+      aria-label={`Evolução do resultado: começa em ${money(points[0].result)} e chega a ${money(final)}.${recovery}`}>
       <defs>
         <linearGradient id={`${gradientId}-line`} gradientUnits="userSpaceOnUse" x1="0" x2="0" y1={PAD.top} y2={PAD.top + PLOT_H}>
           <stop offset={zeroOffset} stopColor="#3f7a59" />
@@ -128,21 +137,29 @@ function ResultEvolutionChart({ days, cost, productionDate }: { days: Production
         textAnchor={x(breakEven) > WIDTH - 110 ? "end" : "middle"}>Custo recuperado</text>}
     </svg>
     <ul className={styles.legend}>
-      <li>Início <strong className={styles.negative}>{money(-cost)}</strong></li>
-      <li>Atual <strong className={final < 0 ? styles.negative : styles.positive}>{money(final)}</strong></li>
+      <li>{includeStart ? "Início" : "Início da página"} <strong className={points[0].result < 0 ? styles.negative : styles.positive}>{money(points[0].result)}</strong></li>
+      <li>{includeStart ? "Atual" : "Fim da página"} <strong className={final < 0 ? styles.negative : styles.positive}>{money(final)}</strong></li>
     </ul>
   </figure>;
 }
 
-export default function ProductionCharts({ days, cost, productionDate }: {
+/** Charts of one page of the daily report; `pagination` navigates between pages of days. */
+export default function ProductionCharts({ days, cost, productionDate, includeStart = true, status = "ready", pagination }: {
   days: ProductionDay[];
   cost: number;
   productionDate: string;
+  /** Whether this page contains the first sale day, so the line starts at the production cost. */
+  includeStart?: boolean;
+  status?: "loading" | "ready" | "error";
+  pagination?: ReactNode;
 }) {
-  return <Panel title="Evolução das vendas" description="Como os pacotes saíram e como o resultado da produção evoluiu dia a dia.">
-    {days.length ? <div className={styles.charts}>
+  return <Panel title="Evolução das vendas" description="Como os pacotes saíram e como o resultado da produção evoluiu dia a dia."
+    aria-busy={status === "loading"}>
+    {status === "error" ? <p className={styles.empty} role="alert">Não foi possível carregar o relatório diário.</p>
+      : days.length ? <div className={styles.charts}>
       <DailyOutflowChart days={days} />
-      <ResultEvolutionChart days={days} cost={cost} productionDate={productionDate} />
-    </div> : <p className={styles.empty}>Os gráficos aparecem assim que a primeira venda ou doação desta produção for registrada.</p>}
+      <ResultEvolutionChart days={days} cost={cost} productionDate={productionDate} includeStart={includeStart} />
+    </div> : status === "ready" && <p className={styles.empty}>Os gráficos aparecem assim que a primeira venda ou doação desta produção for registrada.</p>}
+    {pagination}
   </Panel>;
 }

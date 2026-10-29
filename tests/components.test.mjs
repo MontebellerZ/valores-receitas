@@ -37,6 +37,31 @@ before(async () => {
 });
 after(async () => { await server?.close(); });
 
+test("package flow shows production buyers below lost packages with quantities and spending", async () => {
+  const { default: PackageFlow } = await load(path.join("components", "production", "PackageFlow", "index.tsx"));
+  const { money } = await load(path.join("utils", "format.ts"));
+  const props = {
+    production: { packages: 30, lostPackages: 1 },
+    report: { soldPackages: 14, donatedPackages: 2, lostPackages: 1, availablePackages: 13 },
+    topBuyers: [
+      { customer: "Ana", packages: 11, spent: 16.5 },
+      { customer: "Bruno", packages: 3, spent: 60 },
+    ],
+    onLostChange: () => {},
+  };
+  const markup = render(PackageFlow, props);
+  assert.ok(markup.indexOf("Pacotes perdidos") < markup.indexOf("Top 5 compradores"));
+  assert.ok(markup.indexOf("Ana") < markup.indexOf("Bruno"));
+  assert.match(markup, /11 pacote\(s\)/);
+  assert.ok(markup.includes(money(16.5)));
+  assert.ok(markup.includes(money(60)));
+  assert.match(markup, /compras ainda não pagas/);
+  assert.match(markup, /não inclui doações/);
+  assert.match(render(PackageFlow, { ...props, topBuyers: [] }), /Nenhuma compra registrada nesta produção/);
+  assert.match(render(PackageFlow, { ...props, topBuyers: [{ customer: "", packages: 1, spent: 5 }] }),
+    /Cliente não informado/);
+});
+
 test("every frontend component has an index and an adjacent SCSS module", async () => {
   const files = await filesIn(src);
   const components = files.filter((file) => file.endsWith(".tsx") && path.basename(file) !== "main.tsx");
@@ -179,14 +204,17 @@ test("all application selects reuse the shared searchable select", async () => {
             assert.notEqual(attribute.initializer.text, "select", `Nonsearchable select in ${file}`);
           }
         }
-        if (node.tagName.getText(ast) === "SearchableSelect") consumers.push(path.basename(path.dirname(file)));
+        if (["SearchableSelect", "RemoteSelect"].includes(node.tagName.getText(ast)))
+          consumers.push(path.basename(path.dirname(file)));
       }
       ts.forEachChild(node, visit);
     }
     visit(ast);
   }
-  assert.deepEqual(consumers.sort(), [
-    "OverviewPage", "ProductionFields", "RecipeIngredientsEditor", "SaleForm", "SalesPage", "StockEntryFields",
+  // RemoteSelect is the server-searched variant built on SearchableSelect; Pagination picks the page size.
+  assert.deepEqual([...new Set(consumers)].sort(), [
+    "OverviewPage", "Pagination", "ProductionFields", "RecipeIngredientsEditor", "RemoteSelect", "SaleForm", "SalesPage",
+    "StockEntryFields",
   ].sort());
 });
 
@@ -308,6 +336,7 @@ test("shared UI patterns are reused across consumers instead of copied into page
   const consumers = Object.fromEntries([
     ...Object.keys(owners), "FormField", "SearchField", "FormActions", "BackButton", "Dialog",
     "FormLayout", "FormGrid", "Panel", "MetricGrid", "ProductionFields", "RecipeFields", "RecipeIngredientsEditor",
+    "Pagination", "RemoteSelect",
   ].map(name => [name, new Set()]));
   for (const file of (await filesIn(src)).filter(file => file.endsWith(".tsx"))) {
     const source = await readFile(file, "utf8");
@@ -342,9 +371,11 @@ test("shared UI patterns are reused across consumers instead of copied into page
 
 test("sales registration renders one editor and a selectable cart sidebar while edits remain individual", async () => {
   const { default: SaleForm } = await load(path.join("components", "sales", "SaleForm", "index.tsx"));
+  const balance = { id: "p1", recipeId: "r1", recipeName: "Bolo", date: "2026-10-20", quantity: 1, packages: 5, salePrice: 10,
+    soldPackages: 0, availablePackages: 5, lostPackages: 0, periodSales: { count: 0, packages: 0, revenue: 0, cost: 0 } };
   const props = {
-    productions: [{ id: "p1", recipeName: "Bolo", date: "2026-10-20", packages: 5, salePrice: 10 }],
-    sales: [], onSave: async () => undefined, onSaveSales: async () => undefined, onCancel: () => {},
+    initialBalance: balance, totalAvailable: 5,
+    onSave: async () => undefined, onSaveSales: async () => undefined, onCancel: () => {},
   };
   const cart = render(SaleForm, props);
   assert.match(cart, /Venda 1/);
@@ -362,13 +393,14 @@ test("sales registration renders one editor and a selectable cart sidebar while 
   const sale = { id: "s1", productionId: "p1", productionDate: "2026-10-20",
     recipeName: "Bolo", date: "2026-10-22", packages: 5, pricePerPackage: 8,
     costPerPackage: 2, customer: "Ana", paid: false, notes: "Entrega" };
-  const edit = render(SaleForm, { ...props, sale, sales: [sale] });
+  // The server sold total includes the edited sale itself, which is released while editing it.
+  const edit = render(SaleForm, { ...props, sale, initialBalance: { ...balance, soldPackages: 5, availablePackages: 0 } });
   assert.match(edit, /Salvar venda/);
   assert.match(edit, /value="Ana"/);
   assert.match(edit, /value="2026-10-22"/);
   assert.match(edit, /max="5"/);
   assert.doesNotMatch(edit, /Adicionar outra venda|Confirmar vendas|Total do carrinho|<aside/);
-  const empty = render(SaleForm, { ...props, productions: [] });
+  const empty = render(SaleForm, { ...props, initialBalance: null, totalAvailable: 0 });
   assert.match(empty, /Não há mais pacotes disponíveis/);
   assert.match(empty, /<button[^>]*disabled=""[^>]*>[\s\S]*?Adicionar outra venda/);
 });
@@ -380,12 +412,18 @@ test("market and recipe inputs share the same control styles and preserve stock 
   const item = { id: "flour", name: "Farinha", unit: "g", hasStockHistory: true };
   const noop = () => { };
   const recipe = { id: "cookies", name: "Cookies", category: "Doces", yield: 30, hoursPerBatch: 8, ingredients: [] };
-  const market = render(MarketPage, { market: [item], recipes: [], updateMarket: noop, addMarketItem: noop, onRequestDelete: noop });
+  const market = render(MarketPage, {
+    items: [item], created: [], totalCount: 1, search: "", onSearch: noop,
+    pagination: { page: 1, pageSize: 10, totalCount: 1, totalPages: 1, busy: false, onPageChange: noop, onPageSizeChange: noop },
+    serverSort: { columns: { 0: "name" }, sortBy: "name", descending: false, onSort: noop }, status: "ready",
+    updateMarket: noop, addMarketItem: noop, onRequestDelete: noop,
+  });
   const detail = render(RecipeDetailPage, {
-    recipe, market: [item], updateRecipe: noop, updateIngredient: noop,
+    recipe: { ...recipe, ingredientCount: 0 }, ingredients: [], marketCount: 1, updateRecipe: noop, updateIngredient: noop,
     addIngredient: noop, onRequestDelete: noop, onBack: noop, onCreate: noop,
   });
-  assert.equal(market.match(new RegExp(styles.control, "g")).length, 3);
+  // Search, name, unit and the page-size picker.
+  assert.equal(market.match(new RegExp(styles.control, "g")).length, 4);
   assert.ok(detail.includes(styles.control));
   assert.ok(detail.includes("un./lote"));
   assert.ok(detail.includes("horas"));
@@ -474,4 +512,17 @@ test("responsive styles and portal/dialog rules survive Sass compilation", () =>
     }
   });
   assert.equal(mobileSizes.at(-1), "11px");
+});
+
+test("result chart only dates a cost recovery that happens inside the visible page", async () => {
+  const { default: Charts } = await load(path.join("components", "production", "ProductionCharts", "index.tsx"));
+  const day = (date, cumulativeRevenue) => ({ date, sold: 1, donated: 0, total: 1, revenue: 5, cumulativeRevenue });
+  const label = (props) => render(Charts, { cost: 20, productionDate: "2026-01-01", ...props }).match(/aria-label="(Evolução do resultado[^"]*)"/)[1];
+  const later = label({ includeStart: false, days: [day("2026-03-01", 60), day("2026-03-02", 105)] });
+  assert.match(later, /Custo recuperado antes deste período\./);
+  assert.ok(!later.includes("ainda não"));
+  assert.ok(!later.includes("Custo recuperado em"));
+  assert.match(label({ includeStart: false, days: [day("2026-01-02", 10), day("2026-01-03", 25)] }), /Custo recuperado em .*03/);
+  assert.match(label({ days: [day("2026-01-02", 25), day("2026-01-03", 30)] }), /Custo recuperado em .*02/);
+  assert.match(label({ includeStart: false, days: [day("2026-01-02", 5), day("2026-01-03", 10)] }), /ainda não foi recuperado/);
 });

@@ -1,5 +1,3 @@
-import type { Sale } from "./models";
-
 export const balance = (revenue: number, cost: number) =>
   Math.abs(revenue - cost) <=
   Number.EPSILON * Math.max(1, Math.abs(revenue), Math.abs(cost))
@@ -32,20 +30,4 @@ export function periodStart(period: Period, today: Date) {
     start.setDate(Math.min(today.getDate(), lastDay) + 1);
   }
   return dateKey(start);
-}
-
-export function summarizeSales(sales: Sale[]) {
-  return sales.reduce(
-    (total, sale) => {
-      const revenue = sale.packages * sale.pricePerPackage;
-      return {
-        packages: total.packages + sale.packages,
-        revenue: total.revenue + revenue,
-        received: total.received + (sale.paid ? revenue : 0),
-        pending: total.pending + (sale.paid ? 0 : revenue),
-        cost: total.cost + sale.packages * sale.costPerPackage,
-      };
-    },
-    { packages: 0, revenue: 0, received: 0, pending: 0, cost: 0 },
-  );
 }

@@ -2,6 +2,7 @@ import FormControl from "../FormControl";
 import styles from "./styles.module.scss";
 import {
   useEffect,
+  useEffectEvent,
   useId,
   useLayoutEffect,
   useMemo,
@@ -34,6 +35,19 @@ type Props<T extends string> = {
   "aria-label"?: string;
   "aria-describedby"?: string;
   "aria-invalid"?: ComponentProps<"input">["aria-invalid"];
+  /** Label of the current value when it is not among the loaded options (remote lists). */
+  selectedLabel?: string;
+  /** Server-side search: options are rendered as received and more pages load on demand. */
+  remote?: RemoteOptions;
+};
+
+export type RemoteOptions = {
+  onQueryChange: (query: string) => void;
+  onOpenChange?: (open: boolean) => void;
+  loading?: boolean;
+  hasMore?: boolean;
+  onLoadMore?: () => void;
+  error?: boolean;
 };
 
 export default function SearchableSelect<T extends string>({
@@ -50,6 +64,8 @@ export default function SearchableSelect<T extends string>({
   "aria-label": ariaLabel,
   "aria-describedby": ariaDescribedBy,
   "aria-invalid": ariaInvalid,
+  selectedLabel,
+  remote,
 }: Props<T>) {
   const selectId = useId();
   const rootRef = useRef<HTMLSpanElement>(null);
@@ -64,23 +80,33 @@ export default function SearchableSelect<T extends string>({
     width: 190,
     maxHeight: 220,
   });
-  const selected = options.find((item) => item.value === value);
+  const selected = options.find((item) => item.value === value)
+    ?? (value && selectedLabel !== undefined ? { value, label: selectedLabel } : undefined);
   const expanded = open && !disabled;
+  const changeQuery = (next: string) => {
+    setQuery(next);
+    remote?.onQueryChange(next);
+  };
+  const changeOpen = (next: boolean) => {
+    setOpen(next);
+    remote?.onOpenChange?.(next);
+  };
   const filtered = useMemo(() => {
+    if (remote) return options;
     const normalizedQuery = normalize(query);
     return options.filter((item) =>
       normalize(item.label).includes(normalizedQuery),
     );
-  }, [options, query]);
+  }, [options, query, remote]);
   const activeOptionIndex = filtered[activeIndex] && !filtered[activeIndex].disabled
     ? activeIndex
     : filtered.findIndex((item) => !item.disabled);
 
+  const missingValue = required && (!selected || selected.value === "");
   useLayoutEffect(() => {
-    inputRef.current?.setCustomValidity(
-      required && (!selected || selected.value === "") ? "Selecione uma opção." : "",
-    );
-  }, [required, selected]);
+    inputRef.current?.setCustomValidity(missingValue ? "Selecione uma opção." : "");
+  }, [missingValue]);
+  const closeFromOutside = useEffectEvent(() => changeOpen(false));
 
   useEffect(() => {
     if (expanded)
@@ -95,7 +121,7 @@ export default function SearchableSelect<T extends string>({
         !rootRef.current?.contains(target) &&
         !optionsRef.current?.contains(target)
       )
-        setOpen(false);
+        closeFromOutside();
     };
     document.addEventListener("mousedown", closeOnOutsideClick);
     return () => document.removeEventListener("mousedown", closeOnOutsideClick);
@@ -142,8 +168,8 @@ export default function SearchableSelect<T extends string>({
   const choose = (option: SelectOption<T>) => {
     if (disabled || inputRef.current?.matches(":disabled") || option.disabled) return;
     onChange(option.value);
-    setQuery("");
-    setOpen(false);
+    changeQuery("");
+    changeOpen(false);
   };
 
   const handleKeyDown = (event: ReactKeyboardEvent<HTMLInputElement>) => {
@@ -153,15 +179,15 @@ export default function SearchableSelect<T extends string>({
       let index = expanded ? activeOptionIndex + direction : direction === 1 ? 0 : filtered.length - 1;
       while (index >= 0 && index < filtered.length && filtered[index].disabled) index += direction;
       if (index >= 0 && index < filtered.length) setActiveIndex(index);
-      setOpen(true);
+      changeOpen(true);
     } else if (event.key === "Enter" && expanded) {
       event.preventDefault();
       if (filtered[activeOptionIndex]) choose(filtered[activeOptionIndex]);
     } else if (event.key === "Escape" && expanded) {
       event.preventDefault();
       event.stopPropagation();
-      setQuery("");
-      setOpen(false);
+      changeQuery("");
+      changeOpen(false);
     }
   };
 
@@ -189,25 +215,25 @@ export default function SearchableSelect<T extends string>({
         value={expanded ? query : (selected?.label ?? "")}
         disabled={disabled}
         onFocus={() => {
-          setQuery("");
-          setOpen(true);
+          changeQuery("");
+          changeOpen(true);
           setActiveIndex(0);
         }}
         onBlur={() => {
-          setOpen(false);
-          setQuery("");
+          changeOpen(false);
+          changeQuery("");
         }}
         onClick={() => {
           if (!open) {
-            setQuery("");
-            setOpen(true);
+            changeQuery("");
+            changeOpen(true);
             setActiveIndex(0);
           }
         }}
         onChange={(event) => {
-          setQuery(event.target.value);
+          changeQuery(event.target.value);
           setActiveIndex(0);
-          setOpen(true);
+          if (!open) changeOpen(true);
         }}
         onKeyDown={handleKeyDown}
         controlSize={controlSize}
@@ -251,7 +277,21 @@ export default function SearchableSelect<T extends string>({
                 </button>
               ))
             ) : (
-              <div className={styles["market-select-empty"]}>{emptyMessage}</div>
+              <div className={styles["market-select-empty"]}>
+                {remote?.loading ? "Carregando..." : remote?.error ? "Não foi possível carregar as opções." : emptyMessage}
+              </div>
+            )}
+            {remote?.hasMore && filtered.length > 0 && (
+              <button
+                className={styles["market-select-more"]}
+                type="button"
+                tabIndex={-1}
+                disabled={remote.loading}
+                onMouseDown={(event) => event.preventDefault()}
+                onClick={() => remote.onLoadMore?.()}
+              >
+                {remote.loading ? "Carregando..." : "Carregar mais"}
+              </button>
             )}
           </div>,
           document.body,
