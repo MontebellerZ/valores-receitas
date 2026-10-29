@@ -16,7 +16,7 @@ const summary = {
   revision: 1, counts: { market: 4, recipes: 3, productions: 2, sales: 3 },
   sales: { count: 3, packages: 8, revenue: 200, received: 150, pending: 50, pendingCount: 1, cost: 90, profit: 110 },
   producedPackages: 20, availablePackages: 10, productionCost: 160, lostPackages: 2,
-  productions: { count: 2, soldPackages: 8, losses: 7, remainingRevenue: 250, remainingCost: 80,
+  productions: { count: 2, soldPackages: 8, donatedPackages: 2, losses: 7, remainingRevenue: 250, remainingCost: 80,
     expectedRevenue: 450, referenceRevenue: 400, referenceProfit: 240 },
 };
 const report = {
@@ -86,11 +86,49 @@ test("empty, zero-revenue and negative-result businesses get honest guidance", (
 test("production turnover uses lifetime outflow, not period sales or a page total", () => {
   const html = render({ progress: { ...controls, items: [{
     id: "cake", recipeName: "Bolo", date: "2026-10-01", packages: 10,
-    soldPackages: 8, availablePackages: 1, lostPackages: 1, salePrice: 20,
+    soldPackages: 8, donatedPackages: 2, availablePackages: 1, lostPackages: 1, salePrice: 20,
     periodSales: { count: 1, packages: 2, revenue: 40, cost: 10 },
   }] } });
-  assert.match(html, /value="8" max="10"/);
-  assert.match(html, /80% saiu · 1 disponíveis/);
-  assert.match(html, /vendidos ou doados/);
+  assert.match(html, /Vendidos: 6, Doados: 2, Perdidos: 1, Disponíveis: 1. Total: 10 pacotes/);
+  assert.match(html, /90% com destino definido/);
+  assert.match(html, /Doados/);
   assert.match(html, /Ver produção/);
+});
+
+test("turnover and stock opportunity fill the bar with losses when no packages remain", () => {
+  const html = render({
+    summary: { ...summary, producedPackages: 135, availablePackages: 0, lostPackages: 13,
+      productions: { ...summary.productions, soldPackages: 122, donatedPackages: 14, losses: 20 } },
+    progress: { ...controls, items: [{
+      id: "cookies", recipeName: "Cookies", date: "2026-10-20", packages: 80,
+      soldPackages: 67, donatedPackages: 14, lostPackages: 13, availablePackages: 0, salePrice: 6,
+      periodSales: { count: 1, packages: 67, revenue: 354, cost: 185 },
+    }] },
+  });
+  assert.match(html, /Vendidos: 53, Doados: 14, Perdidos: 13, Disponíveis: 0. Total: 80 pacotes/);
+  assert.match(html, /width:66.25%/);
+  assert.match(html, /width:17.5%/);
+  assert.match(html, /width:16.25%/);
+  assert.match(html, /100% com destino definido/);
+  assert.match(html, /Vendidos: 108, Doados: 14, Perdidos: 13, Disponíveis: 0. Total: 135 pacotes/);
+  assert.match(html, /100% dos pacotes com destino definido/);
+});
+
+test("destination bars preserve exact segment proportions and handle empty or fully lost production", async () => {
+  const { default: Bar } = await server.ssrLoadModule("/src/components/ui/PackageDestinationBar/index.tsx");
+  const renderBar = (values) => renderToStaticMarkup(createElement(Bar, { label: "Destino", donated: 0, ...values }));
+  const mixed = renderBar({ total: 10, sold: 4, donated: 2, lost: 1, available: 3 });
+  assert.deepEqual([...mixed.matchAll(/style="width:([^"]+)"/g)].map((match) => match[1]), ["40%", "20%", "10%", "30%"]);
+  for (const label of ["Vendidos", "Doados", "Perdidos", "Disponíveis"]) assert.ok(mixed.includes(label));
+  assert.match(mixed, /title="Vendidos: 4 pacotes \(40%\)"/);
+  assert.match(mixed, /<strong>4<\/strong>/);
+  assert.ok(!mixed.includes("<small>"));
+  const lost = renderBar({ total: 10, sold: 0, lost: 10, available: 0 });
+  assert.deepEqual([...lost.matchAll(/style="width:([^"]+)"/g)].map((match) => match[1]), ["100%"]);
+  assert.match(lost, /title="Perdidos: 10"/);
+  const sold = renderBar({ total: 10, sold: 10, lost: 0, available: 0 });
+  assert.match(sold, /style="width:100%" title="Vendidos: 10"/);
+  const empty = renderBar({ total: 0, sold: 0, lost: 0, available: 0 });
+  assert.ok(!/NaN|Infinity|style="width:/.test(empty));
+  assert.match(empty, /Total: 0 pacotes/);
 });

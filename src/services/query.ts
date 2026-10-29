@@ -105,10 +105,10 @@ function lookupIds(ids: string[]) {
 
 export function toBalance(raw: unknown): ProductionBalance {
   if (!isRecord(raw) || !isRecord(raw.production)) throw new ApiContractError("saldo sem production.");
-  const totals = requireNumbers(raw, ["soldPackages", "packages", "availablePackages"] as const, "saldo");
+  const totals = requireNumbers(raw, ["soldPackages", "donatedPackages", "packages", "availablePackages"] as const, "saldo");
   const periodSales = requireNumbers(raw.periodSales, ["count", "packages", "revenue", "cost"] as const, "saldo.periodSales");
   const calculated = calculateProduction(normalizeProduction(raw.production as Production));
-  return { ...calculated, packages: totals.packages, soldPackages: totals.soldPackages,
+  return { ...calculated, packages: totals.packages, soldPackages: totals.soldPackages, donatedPackages: totals.donatedPackages,
     availablePackages: totals.availablePackages, periodSales };
 }
 
@@ -119,7 +119,7 @@ export function toSummary(raw: unknown): WorkspaceSummary {
     counts: requireNumbers(raw.counts, ["market", "recipes", "productions", "sales"] as const, "resumo.counts"),
     sales: requireNumbers(raw.sales, ["count", "packages", "revenue", "received", "pending", "pendingCount", "cost", "profit"] as const, "resumo.sales"),
     ...requireNumbers(raw, ["availablePackages", "productionCost", "producedPackages", "lostPackages"] as const, "resumo"),
-    productions: requireNumbers(raw.productions, ["count", "soldPackages", "losses", "remainingRevenue", "remainingCost",
+    productions: requireNumbers(raw.productions, ["count", "soldPackages", "donatedPackages", "losses", "remainingRevenue", "remainingCost",
       "expectedRevenue", "referenceRevenue", "referenceProfit"] as const, "resumo.productions"),
   };
 }

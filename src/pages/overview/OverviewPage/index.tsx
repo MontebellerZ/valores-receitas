@@ -9,6 +9,7 @@ import styles from "./styles.module.scss";
 import PageHeader from "../../../components/ui/PageHeader";
 import Panel from "../../../components/ui/Panel";
 import PaymentBadge from "../../../components/ui/PaymentBadge";
+import PackageDestinationBar from "../../../components/ui/PackageDestinationBar";
 import { money, number as count, dateLabel } from "../../../utils/format";
 import { balance, type Period } from "../../../domain/overview";
 import { ArrowRight, Eye, ShoppingBag, ChartNoAxesCombined, Wallet, Package, CircleAlert, TrendingUp } from "lucide-react";
@@ -45,7 +46,7 @@ const emptySummary: WorkspaceSummary = {
   counts: { market: 0, recipes: 0, productions: 0, sales: 0 },
   sales: { count: 0, packages: 0, revenue: 0, received: 0, pending: 0, pendingCount: 0, cost: 0, profit: 0 },
   availablePackages: 0, productionCost: 0, producedPackages: 0, lostPackages: 0,
-  productions: { count: 0, soldPackages: 0, losses: 0, remainingRevenue: 0, remainingCost: 0,
+  productions: { count: 0, soldPackages: 0, donatedPackages: 0, losses: 0, remainingRevenue: 0, remainingCost: 0,
     expectedRevenue: 0, referenceRevenue: 0, referenceProfit: 0 },
 };
 
@@ -85,9 +86,9 @@ export default function Overview({
     const price = production.expectedSalePrice ?? production.salePrice;
     return { ...production, realized: production.periodSales, hasSales, price, available: production.availablePackages };
   };
-  const soldPercent =
+  const allocatedPercent =
     planning.packages > 0
-      ? Math.min(100, (planning.soldPackages / planning.packages) * 100)
+      ? Math.min(100, ((planning.soldPackages + summary.lostPackages) / planning.packages) * 100)
       : 0;
 
   return (
@@ -196,7 +197,7 @@ export default function Overview({
       </section>
 
       <div className={styles["overview-summary-grid"]}>
-        <Panel className={styles["overview-section"]} title="Giro das produções" description="Produções do período, da mais recente à mais antiga. Saídas incluem vendas e doações de qualquer data." action={
+        <Panel className={styles["overview-section"]} title="Giro das produções" description="Produções do período, da mais recente à mais antiga. Destinos incluem vendas, doações e perdas de pacotes prontos, de qualquer data." action={
             <Button variant="inline" onClick={() => onViewProduction()}>
               Ver produção <ArrowRight size={14} aria-hidden="true" />
             </Button>
@@ -209,7 +210,7 @@ export default function Overview({
                   production.packages > 0
                     ? Math.min(
                       100,
-                      (production.soldPackages / production.packages) *
+                      ((production.soldPackages + (production.lostPackages ?? 0)) / production.packages) *
                       100,
                     )
                     : 0;
@@ -221,18 +222,20 @@ export default function Overview({
                         <small>{dateLabel(production.date)}</small>
                       </div>
                       <span>
-                        {count(production.soldPackages)} /{" "}
-                        {count(production.packages)} pacotes
+                        {count(production.packages)} pacotes produzidos
                       </span>
                     </div>
-                    <progress
-                      aria-label={`Pacotes vendidos ou doados de ${production.recipeName} em ${production.date}`}
-                      value={production.soldPackages}
-                      max={Math.max(1, production.packages)}
+                    <PackageDestinationBar
+                      label={`Destino dos pacotes de ${production.recipeName} em ${production.date}`}
+                      total={production.packages}
+                      sold={production.soldPackages - production.donatedPackages}
+                      donated={production.donatedPackages}
+                      lost={production.lostPackages ?? 0}
+                      available={production.available}
                     />
                     <div className={styles["overview-progress-footer"]}>
                       <Button variant="inline" onClick={() => onViewProduction(production.id)}>Ver produção <ArrowRight size={13} aria-hidden="true" /></Button>
-                      <span>{count(percent, 1)}% saiu · {count(production.available)} disponíveis</span>
+                      <span>{count(percent, 1)}% com destino definido</span>
                     </div>
                   </div>
                 );
@@ -274,12 +277,15 @@ export default function Overview({
           </dl>
           <div className={styles["overview-stock-progress"]}>
             <span>
-              {count(soldPercent, 1)}% dos pacotes dessas produções já vendidos ou doados
+              {count(allocatedPercent, 1)}% dos pacotes com destino definido: vendidos, doados ou perdidos
             </span>
-            <progress
-              aria-label="Percentual de pacotes vendidos ou doados"
-              value={planning.soldPackages}
-              max={Math.max(1, planning.packages)}
+            <PackageDestinationBar
+              label="Destino dos pacotes das produções do período"
+              total={planning.packages}
+              sold={planning.soldPackages - planning.donatedPackages}
+              donated={planning.donatedPackages}
+              lost={summary.lostPackages}
+              available={planning.available}
             />
           </div>
           <details className={styles["overview-reference"]}>

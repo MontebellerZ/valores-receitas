@@ -514,6 +514,23 @@ test("responsive styles and portal/dialog rules survive Sass compilation", () =>
   assert.equal(mobileSizes.at(-1), "11px");
 });
 
+test("overview and sales preserve section spacing including stacked cards and loading panels", () => {
+  const overview = postcss.parse(sass.compile(path.join(src, "pages", "overview", "OverviewPage", "styles.module.scss")).css);
+  const sales = postcss.parse(sass.compile(path.join(src, "pages", "sales", "SalesPage", "styles.module.scss")).css);
+  const values = (css, selector, property) => {
+    const result = [];
+    css.walkRules((rule) => {
+      if (rule.selector === selector) rule.walkDecls(property, (declaration) => result.push(declaration.value));
+    });
+    return result;
+  };
+  assert.deepEqual(values(overview, ".overview-dashboard > section", "margin-bottom"), ["20px"]);
+  assert.deepEqual(values(overview, ".overview-summary-grid", "margin-bottom"), ["20px"]);
+  assert.deepEqual(values(overview, ".overview-summary-grid", "gap"), ["20px", "20px"]);
+  assert.deepEqual(values(sales, ".sales-section", "margin-bottom"), ["20px"]);
+  assert.deepEqual(values(sales, ".balance-details > section", "margin"), ["0"]);
+});
+
 test("result chart only dates a cost recovery that happens inside the visible page", async () => {
   const { default: Charts } = await load(path.join("components", "production", "ProductionCharts", "index.tsx"));
   const day = (date, cumulativeRevenue) => ({ date, sold: 1, donated: 0, total: 1, revenue: 5, cumulativeRevenue });

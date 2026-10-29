@@ -141,13 +141,14 @@ test("detail lookups return null only for missing records", async () => {
 });
 
 test("balances and summaries require the server aggregates", async () => {
-  const balance = { production, soldPackages: 4, packages: 30, availablePackages: 26,
+  const balance = { production, soldPackages: 4, donatedPackages: 1, packages: 30, availablePackages: 26,
     periodSales: { count: 1, packages: 4, revenue: 8, cost: 1 } };
   await withAdapter(() => ({ data: { items: [balance], page: 1, pageSize: 10, totalCount: 1, totalPages: 1 } }), async (requests) => {
     const page = await queryService.balances({ page: 1, pageSize: 10, available: true });
     assert.equal(requests[0].url, "/query/balances");
     assert.equal(requests[0].params.available, true);
     assert.deepEqual([page.items[0].id, page.items[0].soldPackages, page.items[0].availablePackages], [production.id, 4, 26]);
+    assert.equal(page.items[0].donatedPackages, 1);
   });
   await withAdapter(() => ({ data: { items: [{ production }], page: 1, pageSize: 10, totalCount: 1, totalPages: 1 } }), async () => {
     await assert.rejects(queryService.balances({ page: 1, pageSize: 10 }), /Resposta inesperada/);

@@ -15,6 +15,7 @@ O projeto separa **preço sugerido**, **venda esperada** e **venda realizada**, 
 - Ticket médio sem doações, clientes identificados, pacotes doados e produto com maior faturamento em todo o período.
 - Pacotes produzidos e disponíveis, custos registrados, perdas no preparo (unidades) e pacotes prontos perdidos, apresentados separadamente.
 - Giro das produções com todas as saídas (vendas e doações), acesso ao detalhe, tabelas ordenáveis e histórico de movimentações.
+- As barras de giro e oportunidade no estoque usam uma versão compacta de **Destino dos pacotes** da produção: vendidos (verde), doados (dourado), pacotes prontos perdidos (terracota) e disponíveis (verde-claro). Uma barra fina e uma legenda em duas colunas mostram as quantidades sem cartões; o percentual de cada destino aparece ao passar o mouse pela legenda. As doações são apuradas pela API para as mesmas produções e todas as datas de saída, não pelo período das vendas. Quando não há disponíveis, vendas, doações e perdas completam a barra sem confundir perdas com vendas. Perdas no preparo, em unidades, não entram nessas barras de pacotes prontos.
 - Potencial financeiro do estoque restante separado dos resultados realizados, sem somar projeções ao faturamento.
 - Referências do planejamento original disponíveis em uma seção recolhível.
 - Filtro por última semana, último mês, últimos 6 meses, último ano ou desde sempre.

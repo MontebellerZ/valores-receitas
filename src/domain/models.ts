@@ -160,6 +160,7 @@ export type PeriodSales = { count: number; packages: number; revenue: number; co
 
 export type ProductionBalance = CalculatedProduction & {
   soldPackages: number;
+  donatedPackages: number;
   availablePackages: number;
   periodSales: PeriodSales;
 };
@@ -184,6 +185,7 @@ export type WorkspaceSummary = {
   productions: {
     count: number;
     soldPackages: number;
+    donatedPackages: number;
     losses: number;
     remainingRevenue: number;
     remainingCost: number;

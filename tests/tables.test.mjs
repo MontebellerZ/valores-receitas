@@ -123,7 +123,7 @@ test("all table consumers expose server-sortable data columns while preserving a
     losses: 0, margin: 50, packageQty: 1, yieldPerBatch: 10, ingredientCostPerBatch: 5, totalCost: 5,
     cost: 5, produced: 10, packages: 10, costPerPackage: 0.5, salePrice: 1, revenue: 10, profit: 5,
   };
-  const balance = { ...production, soldPackages: 2, availablePackages: 8,
+  const balance = { ...production, soldPackages: 2, donatedPackages: 0, availablePackages: 8,
     periodSales: { count: 1, packages: 2, revenue: 6, cost: 1 } };
   const sale = { id: "sale", productionId: "bread", productionDate: production.date, recipeName: "Pão",
     date: "2026-10-20", packages: 2, pricePerPackage: 3, costPerPackage: 0.5, customer: "Ana", paid: true, notes: "",
@@ -137,7 +137,7 @@ test("all table consumers expose server-sortable data columns while preserving a
     revision: 1, counts: { market: 1, recipes: 1, productions: 1, sales: 1 },
     sales: { count: 1, packages: 2, revenue: 6, received: 6, pending: 0, pendingCount: 0, cost: 1, profit: 5 },
     availablePackages: 8, productionCost: 5, producedPackages: 10, lostPackages: 0,
-    productions: { count: 1, soldPackages: 2, losses: 0, remainingRevenue: 8, remainingCost: 4,
+    productions: { count: 1, soldPackages: 2, donatedPackages: 0, losses: 0, remainingRevenue: 8, remainingCost: 4,
       expectedRevenue: 10, referenceRevenue: 10, referenceProfit: 5 },
   };
   const noop = () => {};

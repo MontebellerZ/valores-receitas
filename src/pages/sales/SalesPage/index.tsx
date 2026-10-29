@@ -119,13 +119,13 @@ export default function Sales({
           <span className={styles["range-label"]}>{range.from ? `${dateLabel(range.from)} a ${dateLabel(range.to ?? "")}` : `Todo o histórico até ${dateLabel(range.to ?? "")}`}</span>
         </div>
       </Panel>
-      {report.status === "error" ? <Panel><p role="alert">Não foi possível carregar os indicadores de vendas. Recarregue a página para tentar novamente.</p></Panel>
+      {report.status === "error" ? <Panel className={styles["sales-section"]}><p role="alert">Não foi possível carregar os indicadores de vendas. Recarregue a página para tentar novamente.</p></Panel>
         : report.data ? <SalesOverview report={report.data} pagination={report.pagination} onPending={() => {
           onPaymentChange("pending");
           historyRef.current?.focus({ preventScroll: true });
           historyRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
         }} />
-          : <Panel><p role="status">Carregando indicadores de vendas...</p></Panel>}
+          : <Panel className={styles["sales-section"]}><p role="status">Carregando indicadores de vendas...</p></Panel>}
       <Panel id="sales-history" ref={historyRef} tabIndex={-1} className={styles["sales-section"]} title="Histórico de vendas"
         description="Consulte vendas e doações. A busca e o pagamento abaixo filtram apenas este histórico."
         action={<SearchField className={styles["sales-search"]} aria-label="Buscar vendas" placeholder="Cliente, produto ou observação..."

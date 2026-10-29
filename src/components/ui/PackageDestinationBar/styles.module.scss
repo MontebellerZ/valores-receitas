@@ -1,0 +1,34 @@
+.bar {
+  display: flex;
+  height: 10px;
+  margin: 8px 0;
+  overflow: hidden;
+  border-radius: 99px;
+  background: #e8ece7;
+  > span { flex: 0 0 auto; height: 100%; }
+  > span + span { border-left: 1px solid #fff; }
+}
+.sold { background: #4f7b62; }
+.donated { background: #d9a556; }
+.lost { background: #c46f5f; }
+.available { background: #c9dccd; }
+.legend {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 5px 18px;
+  margin: 10px 0 12px;
+  padding: 0;
+  list-style: none;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.6;
+  li {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    align-items: center;
+    column-gap: 7px;
+  }
+  strong { color: var(--ink); font-size: 12px; font-weight: 700; font-variant-numeric: tabular-nums; }
+}
+.dot { width: 7px; height: 7px; border-radius: 50%; }
+.label { color: #6f776e; font-size: 11px; overflow-wrap: anywhere; }
