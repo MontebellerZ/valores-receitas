@@ -142,6 +142,9 @@ test("all table consumers expose server-sortable data columns while preserving a
   };
   const noop = () => {};
   const salesProps = (items) => ({
+    report: { status: "loading", pagination: controls([], {}).pagination },
+    period: "month", onPeriodChange: noop, range: { from: "2026-10-01", to: "2026-10-31" },
+    payment: "", onPaymentChange: noop,
     summary, balances: controls([balance], columns.balanceSortColumns, "recipeName"),
     sales: controls(items, columns.salesSortColumns, "date", true), productionFilter: { id: "" },
     onProductionFilter: noop, search: "", onSearch: noop, onCreate: noop, onEdit: noop, onDelete: noop, onViewProduction: noop,

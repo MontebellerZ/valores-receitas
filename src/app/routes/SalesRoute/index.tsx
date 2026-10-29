@@ -10,6 +10,8 @@ import { queryService } from "../../../services/query";
 import { balanceSortColumns, salesSortColumns } from "../../../domain/sortColumns";
 import { paths } from "../../paths";
 import SaleForm from "../../../components/sales/SaleForm";
+import { useSalesReport } from "../../../hooks/useSalesReport";
+import { dateKey, periodStart, type Period } from "../../../domain/overview";
 
 /** Most recent production that still has packages to sell. */
 const loadFirstAvailable = async (_scope: string, signal: AbortSignal) =>
@@ -23,6 +25,12 @@ export default function SalesRoute() {
   const [isCreating, setIsCreating] = useState(false);
   const [productionFilter, setProductionFilter] = useState<{ id: string; label?: string }>({ id: "" });
   const [search, setSearch] = useState("");
+  const [period, setPeriod] = useState<Period>("month");
+  const [payment, setPayment] = useState("");
+  const today = new Date();
+  const range = { from: periodStart(period, today) || undefined, to: dateKey(today) };
+  const filters = { ...range, productionId: productionFilter.id || undefined };
+  const report = useSalesReport(filters, workspace.dataVersion);
   const debounced = useDebouncedValue(search.trim());
   const creating = (isCreating || isNewRoute) && !saleId;
 
@@ -31,7 +39,7 @@ export default function SalesRoute() {
     defaultSort: { sortBy: "date", descending: true }, errorMessage: "Não foi possível carregar o saldo das produções.",
   });
   const sales = usePagedQuery({
-    fetcher: queryService.sales, filters: { productionId: productionFilter.id || undefined, search: debounced },
+    fetcher: queryService.sales, filters: { ...filters, search: debounced, payment: payment || undefined },
     version: workspace.dataVersion, defaultSort: { sortBy: "date", descending: true },
     errorMessage: "Não foi possível carregar as vendas.",
   });
@@ -58,6 +66,12 @@ export default function SalesRoute() {
     <>
       <SalesPage
         summary={workspace.summary}
+        report={report}
+        period={period}
+        onPeriodChange={setPeriod}
+        range={range}
+        payment={payment}
+        onPaymentChange={setPayment}
         balances={{ ...listControls(balances, balanceSortColumns), items: balances.items }}
         sales={{ ...listControls(sales, salesSortColumns), items: sales.items }}
         productionFilter={productionFilter}

@@ -220,6 +220,16 @@ export type ProductionDayRow = {
 
 export type ProductionBuyer = { customer: string; packages: number; spent: number };
 
+export type SalesReport = {
+  totals: {
+    count: number; packages: number; donatedPackages: number; pendingCount: number; customers: number;
+    revenue: number; received: number; pending: number; cost: number; donationCost: number;
+  };
+  daily: Page<{ date: string; packages: number; revenue: number }>;
+  topProducts: { name: string; packages: number; revenue: number; cost: number }[];
+  topBuyers: ProductionBuyer[];
+};
+
 export type ProductionReportPage = ProductionSalesTotals & {
   daily: Page<ProductionDayRow>;
   topBuyers: ProductionBuyer[];

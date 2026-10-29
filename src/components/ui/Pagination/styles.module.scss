@@ -15,6 +15,14 @@
 
 .controls {
   display: inline-flex;
+  flex-wrap: wrap;
+  max-width: 100%;
+  align-items: center;
+  gap: 8px;
+}
+
+.navigation {
+  display: inline-flex;
   align-items: center;
   gap: 8px;
 }
@@ -25,4 +33,5 @@
 
 .size {
   width: 140px;
+  flex-shrink: 0;
 }

@@ -33,11 +33,13 @@ export default function Pagination({
         <SearchableSelect controlSize="compact" className={styles.size} aria-label="Itens por página"
           value={String(pageSize)} options={pageSizeOptions}
           onChange={(value) => onPageSizeChange(Number(value) as PageSize)} />
-        <IconButton size="small" aria-label="Página anterior" disabled={page <= 1}
-          onClick={() => onPageChange(page - 1)}><ChevronLeft size={16} aria-hidden="true" /></IconButton>
-        <span className={styles.position}>Página {number(Math.min(page, Math.max(totalPages, 1)))} de {number(Math.max(totalPages, 1))}</span>
-        <IconButton size="small" aria-label="Próxima página" disabled={page >= totalPages}
-          onClick={() => onPageChange(page + 1)}><ChevronRight size={16} aria-hidden="true" /></IconButton>
+        <span className={styles.navigation}>
+          <IconButton size="small" aria-label="Página anterior" disabled={page <= 1}
+            onClick={() => onPageChange(page - 1)}><ChevronLeft size={16} aria-hidden="true" /></IconButton>
+          <span className={styles.position}>Página {number(Math.min(page, Math.max(totalPages, 1)))} de {number(Math.max(totalPages, 1))}</span>
+          <IconButton size="small" aria-label="Próxima página" disabled={page >= totalPages}
+            onClick={() => onPageChange(page + 1)}><ChevronRight size={16} aria-hidden="true" /></IconButton>
+        </span>
       </span>
     </nav>
   );

@@ -11,6 +11,7 @@ import type {
   RecipeListItem,
   Ingredient,
   Sale,
+  SalesReport,
   StockConsumption,
   StockLotItem,
   StockTotal,
@@ -153,6 +154,30 @@ export function toReport(raw: unknown): ProductionReportPage {
   };
 }
 
+export function toSalesReport(raw: unknown): SalesReport {
+  if (!isRecord(raw)) throw new ApiContractError("relatório de vendas ausente.");
+  const totals = requireNumbers(raw.totals, ["count", "packages", "donatedPackages", "pendingCount", "customers",
+    "revenue", "received", "pending", "cost", "donationCost"] as const, "vendas.totals");
+  if (!Array.isArray(raw.topProducts) || raw.topProducts.length > 5 ||
+      !Array.isArray(raw.topBuyers) || raw.topBuyers.length > 5)
+    throw new ApiContractError("rankings de vendas devem conter até cinco itens.");
+  return {
+    totals,
+    daily: mapPage(assertPage<unknown>(raw.daily, "vendas.daily"), (day) => {
+      if (!isRecord(day) || typeof day.date !== "string") throw new ApiContractError("dia de vendas sem data.");
+      return { date: day.date.slice(0, 10), ...requireNumbers(day, ["packages", "revenue"] as const, "vendas.daily") };
+    }),
+    topProducts: raw.topProducts.map((item: unknown) => {
+      if (!isRecord(item) || typeof item.name !== "string") throw new ApiContractError("produto sem nome.");
+      return { name: item.name, ...requireNumbers(item, ["packages", "revenue", "cost"] as const, "vendas.produto") };
+    }),
+    topBuyers: raw.topBuyers.map((item: unknown) => {
+      if (!isRecord(item) || typeof item.customer !== "string") throw new ApiContractError("cliente sem nome.");
+      return { customer: item.customer, ...requireNumbers(item, ["packages", "spent"] as const, "vendas.cliente") };
+    }),
+  };
+}
+
 function toMarketItem(raw: MarketListItem): MarketListItem {
   return { ...raw, ingredientCount: requireNumber(raw.ingredientCount, "insumo.ingredientCount") };
 }
@@ -167,6 +192,10 @@ function toStockLot(raw: StockLotItem): StockLotItem {
 }
 
 export const queryService = {
+  async salesReport(params: ListRequest, signal?: AbortSignal) {
+    const { data } = await api.get<unknown>("/query/sales-report", { params: cleanParams(params), signal });
+    return toSalesReport(data);
+  },
   async summary(range: DateRange = {}, signal?: AbortSignal) {
     const { data } = await api.get<unknown>("/query/summary", { params: cleanParams(range), signal });
     return toSummary(data);
