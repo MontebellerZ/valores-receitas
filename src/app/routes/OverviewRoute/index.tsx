@@ -4,6 +4,7 @@ import OverviewPage from "../../../pages/overview/OverviewPage";
 import ImportWorkbookButton from "../../../components/workbook/ImportWorkbookButton";
 import { useWorkspaceContext } from "../../../hooks/useWorkspaceContext";
 import { useResource } from "../../../hooks/useResource";
+import { useSalesReport } from "../../../hooks/useSalesReport";
 import { listControls, usePagedQuery } from "../../../hooks/usePagedQuery";
 import { dateKey, periodStart, type Period } from "../../../domain/overview";
 import { queryService } from "../../../services/query";
@@ -24,6 +25,7 @@ export default function OverviewRoute() {
   const end = dateKey(today);
   const start = periodStart(period, today);
   const range = { from: start || undefined, to: end };
+  const financial = useSalesReport(range, workspace.dataVersion);
   const summary = useResource(loadSummary, `${start}|${end}`, workspace.dataVersion,
     "Não foi possível carregar o resumo do período.");
   const progress = usePagedQuery({
@@ -44,6 +46,7 @@ export default function OverviewRoute() {
       onPeriodChange={setPeriod}
       range={{ start, end }}
       summary={summary.data}
+      financial={financial}
       summaryStatus={summary.status === "ready" ? "ready" : summary.status === "loading" ? "loading" : "error"}
       progress={{ ...listControls(progress), items: progress.items }}
       productions={{ ...listControls(productions, overviewBalanceSortColumns), items: productions.items }}

@@ -7,14 +7,14 @@ import SearchableSelect from "../../../components/ui/SearchableSelect";
 import Pagination from "../../../components/ui/Pagination";
 import styles from "./styles.module.scss";
 import PageHeader from "../../../components/ui/PageHeader";
-import MetricCard, { MetricGrid } from "../../../components/ui/MetricCard";
 import Panel from "../../../components/ui/Panel";
 import PaymentBadge from "../../../components/ui/PaymentBadge";
 import { money, number as count, dateLabel } from "../../../utils/format";
 import { balance, type Period } from "../../../domain/overview";
-import { ArrowRight, Eye, ShoppingBag } from "lucide-react";
+import { ArrowRight, Eye, ShoppingBag, ChartNoAxesCombined, Wallet, Package, CircleAlert, TrendingUp } from "lucide-react";
 import type { ReactNode } from "react";
-import type { ProductionBalance, Sale, WorkspaceSummary } from "../../../domain/models";
+import type { ProductionBalance, Sale, SalesReport, WorkspaceSummary } from "../../../domain/models";
+import type { Resource } from "../../../hooks/useResource";
 import type { ListControls } from "../../../hooks/usePagedQuery";
 import logoVertical from "../../../assets/brand/conta-de-chef-vertical.png";
 
@@ -27,6 +27,7 @@ type Props = {
   /** Server totals for the period; `undefined` while loading. */
   summary?: WorkspaceSummary;
   summaryStatus: "loading" | "ready" | "error";
+  financial: { data?: SalesReport; status: Resource<SalesReport>["status"] };
   /** Productions of the period with global sold/available and the sales of the period. */
   progress: ListControls & { items: ProductionBalance[] };
   productions: ListControls & { items: ProductionBalance[] };
@@ -54,6 +55,7 @@ export default function Overview({
   range: { start, end },
   summary: loadedSummary,
   summaryStatus,
+  financial,
   progress,
   productions,
   recentSales: recent,
@@ -64,8 +66,10 @@ export default function Overview({
   onViewProduction,
 }: Props) {
   const summary = loadedSummary ?? emptySummary;
-  const actual = summary.sales;
-  const actualProfit = balance(actual.revenue, actual.cost);
+  const totals = financial.data?.totals;
+  const actualProfit = totals ? balance(totals.revenue, totals.cost + totals.donationCost) : 0;
+  const margin = totals && totals.revenue > 0 ? actualProfit / totals.revenue * 100 : null;
+  const receivedPercent = totals && totals.revenue > 0 ? totals.received / totals.revenue * 100 : 0;
   const planning = {
     packages: summary.producedPackages,
     available: summary.availablePackages,
@@ -89,13 +93,10 @@ export default function Overview({
   return (
     <div className={styles["overview-dashboard"]}>
       <PageHeader
-        variant="welcome"
         title={<>Visão geral</>}
         eyebrow="SEU NEGÓCIO, EM NÚMEROS"
         eyebrowDot
-        description={loadedSummary
-          ? `${summary.productions.count} produções · ${summary.sales.count} vendas · ${recipeCount} receitas · ${marketCount} insumos`
-          : summaryStatus === "error" ? "Não foi possível carregar o resumo do período." : "Carregando resumo do período..."}
+        description="Resultados, oportunidades e próximos passos para cuidar do seu negócio."
         action={
           <div className={styles["welcome-actions"]}>
             {importAction}
@@ -105,6 +106,8 @@ export default function Overview({
           </div>
         }
       />
+      <Panel className={styles.filters} title="Seu negócio em perspectiva"
+        description="Vendas pela data da venda. Produções pela data de produção; seus saldos consideram todas as saídas registradas.">
       <div className={styles["overview-period-filter"]}>
         <FormField label="Período" variant="inline">
           <SearchableSelect<Period>
@@ -112,7 +115,7 @@ export default function Overview({
             value={period}
             onChange={setPeriod}
             options={[
-              { value: "week", label: "Última semana" },
+              { value: "week", label: "Últimos 7 dias" },
               { value: "month", label: "Último mês" },
               { value: "six-months", label: "Últimos 6 meses" },
               { value: "year", label: "Último ano" },
@@ -123,59 +126,90 @@ export default function Overview({
         <span>
           {start
             ? `${dateLabel(start)} a ${dateLabel(end)}`
-            : `Até ${dateLabel(end)}`}
+            : `Todo o histórico até ${dateLabel(end)}`}
         </span>
       </div>
+      </Panel>
 
-      <MetricGrid aria-label="Resultados reais" aria-busy={summaryStatus === "loading"}>
-        <MetricCard
-          variant="overview"
-          label="Faturamento vendido"
-          value={<>{money(actual.revenue)}</>}
-          caption={`${count(actual.packages)} pacotes vendidos`}
-        />
-        <MetricCard
-          variant="overview"
-          label="Recebido"
-          value={<>{money(actual.received)}</>}
-          caption={<>Valores recebidos</>}
-        />
-        <MetricCard
-          variant="overview"
-          label="A receber"
-          value={<>{money(actual.pending)}</>}
-          caption={`${count(actual.pendingCount)} vendas pendentes`}
-        />
-        <MetricCard
-          variant="overview"
-          label="Resultado das vendas"
-          value={<>{money(actualProfit)}</>}
-          caption={<>Ingredientes vendidos: {money(actual.cost)}</>}
-          negative={actualProfit < 0}
-        />
-      </MetricGrid>
+      {financial.status === "error" || financial.status === "missing" ?
+        <Panel><p role="alert">Não foi possível carregar os resultados do negócio. Recarregue a página para tentar novamente.</p></Panel>
+        : !totals ? <Panel><p role="status">Carregando resultados do negócio...</p></Panel> : <>
+        <section className={styles.hero} aria-label="Resultados do negócio">
+          <div className={styles["hero-heading"]}>
+            <div><span className={styles.eyebrow}><ChartNoAxesCombined size={16} aria-hidden="true" /> PANORAMA DO NEGÓCIO</span>
+              <h2>Cada número, uma decisão melhor.</h2>
+              <p>O que você vendeu, o que já entrou e o resultado que ficou.</p></div>
+            <ChartNoAxesCombined size={48} className={styles["hero-icon"]} aria-hidden="true" />
+          </div>
+          <dl className={styles.kpis}>
+            <div><dt>Faturamento vendido</dt><dd>{money(totals.revenue)}</dd><small>{count(totals.count)} venda(s) · {count(totals.packages)} pacotes</small></div>
+            <div><dt>Resultado após doações</dt><dd className={actualProfit < 0 ? styles.negative : undefined}>{money(actualProfit)}</dd>
+              <small>{margin === null ? "Sem faturamento para calcular a margem" : `${count(margin, 1)}% de margem sobre o faturamento`}</small></div>
+            <div><dt>Dinheiro recebido</dt><dd>{money(totals.received)}</dd><small>{count(receivedPercent, 1)}% do faturamento recebido</small></div>
+            <div><dt>A receber</dt><dd>{money(totals.pending)}</dd><small>{count(totals.pendingCount)} venda(s) com pagamento pendente</small></div>
+          </dl>
+          <p className={styles["hero-note"]}>Resultado = faturamento − custo dos vendidos − custo das doações. Não inclui outras despesas e não representa saldo em caixa.</p>
+        </section>
+        <div className={styles["business-grid"]}>
+          <Panel title="No radar" description="Sinais para orientar seus próximos passos.">
+            <div className={styles.radar}>
+              {totals.pendingCount > 0 && <div><span className={styles["signal-icon"]}><Wallet size={19} aria-hidden="true" /></span>
+                <div><strong>{money(totals.pending)} para acompanhar</strong><p>Confira os pagamentos de {count(totals.pendingCount)} venda(s) ainda não recebida(s).</p>
+                  <Button variant="inline" onClick={onViewSales}>Consultar vendas <ArrowRight size={14} aria-hidden="true" /></Button></div></div>}
+              {actualProfit < 0 && <div><span className={styles["signal-icon"]}><CircleAlert size={19} aria-hidden="true" /></span>
+                <div><strong>O resultado está negativo</strong><p>Os custos dos pacotes vendidos e doados superam o faturamento. Revise custos e preços antes das próximas vendas.</p>
+                  <Button variant="inline" onClick={() => onViewProduction()}>Revisar produções <ArrowRight size={14} aria-hidden="true" /></Button></div></div>}
+              {summaryStatus === "ready" && planning.available > 0 && <div><span className={styles["signal-icon"]}><Package size={19} aria-hidden="true" /></span>
+                <div><strong>{count(planning.available)} pacotes podem virar venda</strong><p>Saldo das produções do período, com potencial de {money(planning.remainingRevenue)} em faturamento.</p>
+                  <Button variant="inline" onClick={onViewSales}>Ir para vendas <ArrowRight size={14} aria-hidden="true" /></Button></div></div>}
+              {totals.count === 0 && <div><span className={styles["signal-icon"]}><ShoppingBag size={19} aria-hidden="true" /></span>
+                <div><strong>A próxima venda começa aqui</strong><p>Não há vendas neste período. Consulte seu histórico em outro período ou registre uma venda.</p>
+                  <Button variant="inline" onClick={onViewSales}>Explorar vendas <ArrowRight size={14} aria-hidden="true" /></Button></div></div>}
+              {totals.count > 0 && totals.pendingCount === 0 && actualProfit >= 0 && <div><span className={styles["signal-icon"]}><TrendingUp size={19} aria-hidden="true" /></span>
+                <div><strong>Pagamentos em dia neste período</strong><p>Não há vendas pendentes de recebimento. Continue acompanhando seus custos e resultados.</p></div></div>}
+            </div>
+          </Panel>
+          <Panel title="O que movimenta o negócio" description="Indicadores de vendas de todo o período, não apenas da página exibida.">
+            <dl className={styles.indicators}>
+              <div><dt>Ticket médio<small>Valor por venda, sem doações</small></dt><dd>{totals.count ? money(totals.revenue / totals.count) : "—"}</dd></div>
+              <div><dt>Clientes identificados<small>Compradores com nome informado</small></dt><dd>{count(totals.customers)}</dd></div>
+              <div><dt>Pacotes doados<small>Custo registrado: {money(totals.donationCost)}</small></dt><dd>{count(totals.donatedPackages)}</dd></div>
+            </dl>
+            <h3 className={styles["product-title"]}>Produto com maior faturamento</h3>
+            {financial.data?.topProducts[0] ? <div className={styles["featured-product"]}>
+              <span className={styles["signal-icon"]}><TrendingUp size={19} aria-hidden="true" /></span>
+              <div><strong>{financial.data.topProducts[0].name}</strong><p>{count(financial.data.topProducts[0].packages)} pacotes vendidos</p></div>
+              <b>{money(financial.data.topProducts[0].revenue)}</b>
+            </div> : <p className={styles.footnote}>Seus produtos em destaque aparecerão após as primeiras vendas.</p>}
+          </Panel>
+        </div>
+      </>}
 
-      <MetricGrid variant="band" aria-label="Produção e estoque">
-        <MetricCard variant="compact" label="Pacotes produzidos" value={count(planning.packages)} />
-        <MetricCard variant="compact" label="Pacotes disponíveis" value={count(planning.available)} />
-        <MetricCard variant="compact" label="Custo total registrado" value={money(planning.cost)} />
-        <MetricCard variant="compact" label="Perdas registradas" value={<>{count(planning.losses)} un.</>} />
-      </MetricGrid>
+      {summaryStatus === "error" ? <Panel><p role="alert">Não foi possível carregar os indicadores de produção e estoque. Recarregue a página para tentar novamente.</p></Panel>
+        : summaryStatus !== "ready" ? <Panel><p role="status">Carregando produção e estoque...</p></Panel> : <>
+      <section className={styles["operations-band"]} aria-label="Produção e estoque do período">
+        <div><Package size={21} aria-hidden="true" /><span>DA PRODUÇÃO À VENDA<small>{count(planning.count)} produções no período</small></span></div>
+        <dl><div><dt>Pacotes produzidos</dt><dd>{count(planning.packages)}</dd></div>
+          <div><dt>Disponíveis agora</dt><dd>{count(planning.available)}</dd></div>
+          <div><dt>Custo de produção</dt><dd>{money(planning.cost)}</dd></div>
+          <div><dt>Pacotes perdidos</dt><dd>{count(summary.lostPackages)}</dd></div></dl>
+      </section>
 
       <div className={styles["overview-summary-grid"]}>
-        <Panel variant="plain" className={styles["overview-section"]} title="Vendas por produção" action={
+        <Panel className={styles["overview-section"]} title="Giro das produções" description="Produções do período, da mais recente à mais antiga. Saídas incluem vendas e doações de qualquer data." action={
             <Button variant="inline" onClick={() => onViewProduction()}>
               Ver produção <ArrowRight size={14} aria-hidden="true" />
             </Button>
           }>
-          {progress.items.length ? (
+          {progress.status === "loading" && <p role="status">Atualizando giro das produções...</p>}
+          {progress.status === "error" ? <EmptyState>Não foi possível carregar as produções do período.</EmptyState> : progress.items.length ? (
             <div className={styles["overview-production-progress"]} aria-busy={progress.status === "loading"}>
               {progress.items.map(describe).map((production) => {
                 const percent =
                   production.packages > 0
                     ? Math.min(
                       100,
-                      (production.realized.packages / production.packages) *
+                      (production.soldPackages / production.packages) *
                       100,
                     )
                     : 0;
@@ -187,25 +221,23 @@ export default function Overview({
                         <small>{dateLabel(production.date)}</small>
                       </div>
                       <span>
-                        {count(production.realized.packages)} /{" "}
+                        {count(production.soldPackages)} /{" "}
                         {count(production.packages)} pacotes
                       </span>
                     </div>
                     <progress
-                      aria-label={`Pacotes vendidos de ${production.recipeName} em ${production.date}`}
-                      value={production.realized.packages}
+                      aria-label={`Pacotes vendidos ou doados de ${production.recipeName} em ${production.date}`}
+                      value={production.soldPackages}
                       max={Math.max(1, production.packages)}
                     />
                     <div className={styles["overview-progress-footer"]}>
-                      <span>{money(production.realized.revenue)} vendidos</span>
-                      <span>{count(percent, 1)}% vendido</span>
+                      <Button variant="inline" onClick={() => onViewProduction(production.id)}>Ver produção <ArrowRight size={13} aria-hidden="true" /></Button>
+                      <span>{count(percent, 1)}% saiu · {count(production.available)} disponíveis</span>
                     </div>
                   </div>
                 );
               })}
             </div>
-          ) : progress.status === "error" ? (
-            <EmptyState>Não foi possível carregar as produções do período.</EmptyState>
           ) : progress.status === "ready" && (
             <EmptyState className={styles["overview-empty-brand"]}>
               <img src={logoVertical} alt="" width="548" height="309" />
@@ -215,7 +247,7 @@ export default function Overview({
           {progress.pagination.totalCount > 0 && <Pagination {...progress.pagination} label="produções" />}
         </Panel>
 
-        <Panel variant="plain" className={styles["overview-section"]} title="Planejamento do estoque" action={
+        <Panel className={styles["overview-section"]} title="Oportunidade no estoque" description="Projeção dos pacotes ainda disponíveis das produções do período. Não é venda nem dinheiro recebido." action={
             <span className={styles["round-icon"]}>
               <ShoppingBag size={17} aria-hidden="true" />
             </span>
@@ -232,28 +264,20 @@ export default function Overview({
               </dd>
             </div>
             <div>
-              <dt>Vendido + potencial restante</dt>
-              <dd>{money(actual.revenue + planning.remainingRevenue)}</dd>
+              <dt>Custo dos pacotes disponíveis</dt>
+              <dd>{money(planning.remainingCost)}</dd>
             </div>
             <div>
-              <dt>Resultado vendido + potencial</dt>
-              <dd
-                className={
-                  actualProfit + remainingProfit < 0
-                    ? styles["text-negative"]
-                    : undefined
-                }
-              >
-                {money(actualProfit + remainingProfit)}
-              </dd>
+              <dt>Perdas no preparo</dt>
+              <dd>{count(planning.losses)} unidades</dd>
             </div>
           </dl>
           <div className={styles["overview-stock-progress"]}>
             <span>
-              {count(soldPercent, 1)}% dos pacotes dessas produções já vendidos
+              {count(soldPercent, 1)}% dos pacotes dessas produções já vendidos ou doados
             </span>
             <progress
-              aria-label="Percentual de pacotes vendidos"
+              aria-label="Percentual de pacotes vendidos ou doados"
               value={planning.soldPackages}
               max={Math.max(1, planning.packages)}
             />
@@ -277,13 +301,15 @@ export default function Overview({
           </details>
         </Panel>
       </div>
+      </>}
 
-      <Panel variant="plain" className={styles["overview-section"]} title="Resumo das produções" action={
+      <Panel className={styles["overview-section"]} title="Explore as produções" description="Valores realizados quando há vendas no período; caso contrário, valores esperados ou previstos. Não some projeções ao resultado realizado." action={
           <Button variant="inline" onClick={() => onViewProduction()}>
             Ver todas <ArrowRight size={14} aria-hidden="true" />
           </Button>
         }>
-        {productions.items.length ? (
+        {productions.status === "loading" && <p role="status">Atualizando produções...</p>}
+        {productions.status === "error" ? <EmptyState>Não foi possível carregar as produções do período.</EmptyState> : productions.items.length ? (
           <DataTable variant="sales" serverSort={productions.serverSort} aria-busy={productions.status === "loading"}><thead>
                 <tr>
                   <th>Produção</th>
@@ -361,20 +387,19 @@ export default function Overview({
                   );
                 })}
               </tbody></DataTable>
-        ) : productions.status === "error" ? (
-          <EmptyState>Não foi possível carregar as produções do período.</EmptyState>
         ) : productions.status === "ready" && (
           <EmptyState>Nenhuma produção registrada.</EmptyState>
         )}
         {productions.pagination.totalCount > 0 && <Pagination {...productions.pagination} label="produções" />}
       </Panel>
 
-      <Panel variant="plain" className={styles["overview-section"]} title="Vendas recentes" action={
+      <Panel className={styles["overview-section"]} title="Últimas movimentações" description="Vendas e doações do período. Para consultar pagamentos e registrar vendas, acesse Vendas." action={
           <Button variant="inline" onClick={onViewSales}>
             Ver vendas <ArrowRight size={14} aria-hidden="true" />
           </Button>
         }>
-        {recent.items.length ? (
+        {recent.status === "loading" && <p role="status">Atualizando movimentações...</p>}
+        {recent.status === "error" ? <EmptyState>Não foi possível carregar as vendas do período.</EmptyState> : recent.items.length ? (
           <DataTable variant="sales" serverSort={recent.serverSort} aria-busy={recent.status === "loading"}><thead>
                 <tr>
                   <th>Venda</th>
@@ -399,13 +424,12 @@ export default function Overview({
                   </tr>
                 ))}
               </tbody></DataTable>
-        ) : recent.status === "error" ? (
-          <EmptyState>Não foi possível carregar as vendas do período.</EmptyState>
         ) : recent.status === "ready" && (
           <EmptyState>Nenhuma venda registrada.</EmptyState>
         )}
         {recent.pagination.totalCount > 0 && <Pagination {...recent.pagination} label="vendas" />}
       </Panel>
+      <p className={styles.footnote}>Sua base de trabalho: {count(recipeCount)} receitas e {count(marketCount)} insumos cadastrados, independentemente do período.</p>
     </div>
   );
 }

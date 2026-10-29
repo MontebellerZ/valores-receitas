@@ -10,12 +10,16 @@ O projeto separa **preço sugerido**, **venda esperada** e **venda realizada**, 
 
 ### Visão geral
 
-- Faturamento vendido, valores recebidos, valores a receber e resultado das vendas.
-- Pacotes produzidos e disponíveis, custos registrados e perdas.
-- Acompanhamento das vendas por produção e histórico de vendas recentes.
-- Potencial financeiro do estoque restante, sem contar novamente os pacotes já vendidos.
+- Panorama com faturamento, resultado após o custo das doações, dinheiro recebido e pagamentos pendentes. Resultado não é saldo em caixa e não inclui outras despesas.
+- Painel **No radar** com sinais de recebimentos pendentes, resultado negativo e pacotes disponíveis, com atalhos para vendas e produção.
+- Ticket médio sem doações, clientes identificados, pacotes doados e produto com maior faturamento em todo o período.
+- Pacotes produzidos e disponíveis, custos registrados, perdas no preparo (unidades) e pacotes prontos perdidos, apresentados separadamente.
+- Giro das produções com todas as saídas (vendas e doações), acesso ao detalhe, tabelas ordenáveis e histórico de movimentações.
+- Potencial financeiro do estoque restante separado dos resultados realizados, sem somar projeções ao faturamento.
 - Referências do planejamento original disponíveis em uma seção recolhível.
 - Filtro por última semana, último mês, últimos 6 meses, último ano ou desde sempre.
+
+O período filtra vendas pela data da venda e produções pela data de produção. Os saldos das produções consideram todas as saídas registradas, de qualquer data. Indicadores globais não são calculados a partir de uma página das tabelas. Carregamentos e erros são explícitos, sem apresentar valores zerados como resultados carregados.
 
 Os resumos priorizam **vendas realizadas → preço desejado → preço sugerido**. Quando existem vendas para uma produção no período selecionado, o resumo mostra os valores reais e o preço médio praticado. Sem vendas nesse período, usa o preço desejado salvo ou, se ele não foi definido, o preço sugerido pelo acréscimo sobre o custo.
 

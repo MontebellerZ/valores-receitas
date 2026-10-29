@@ -48,7 +48,7 @@ export default function PackageFlow({ production, report, topBuyers, disabled = 
     </div>
     <section className={styles.ranking} aria-label="Top 5 compradores desta produção">
       <h3>Top 5 compradores</h3>
-      <p>Quem mais comprou pacotes nesta produção.</p>
+      <p>Quem mais comprou pacotes nesta produção. Inclui compras ainda não pagas; não inclui doações.</p>
       {topBuyers.length === 0 ? <p>Nenhuma compra registrada nesta produção.</p> : (
         <ol className={styles.buyers}>
           {topBuyers.map((buyer, index) => <li key={buyer.customer}>

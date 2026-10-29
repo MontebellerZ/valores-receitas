@@ -157,7 +157,7 @@ test("all table consumers expose server-sortable data columns while preserving a
       hasEmptyRow: false, marketCount: 1, onChange: noop, onAdd: noop, onRemove: noop }, 3],
     [Sales, salesProps([sale]), 11],
     [Overview, { period: "month", onPeriodChange: noop, range: { start: "2026-10-01", end: "2026-10-31" }, summary,
-      summaryStatus: "ready", progress: controls([balance], {}), productions: controls([balance], columns.overviewBalanceSortColumns),
+      summaryStatus: "ready", financial: { status: "loading" }, progress: controls([balance], {}), productions: controls([balance], columns.overviewBalanceSortColumns),
       recentSales: controls([sale], columns.overviewSalesSortColumns), recipeCount: 1, marketCount: 1, importAction: null,
       onViewSales: noop, onViewProduction: noop }, 11],
     [RealizedSales, { report: totals, sales: controls([sale], columns.realizedSalesSortColumns, "date"), onViewSales: noop }, 6],
