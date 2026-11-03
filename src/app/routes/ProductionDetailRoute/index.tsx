@@ -57,6 +57,8 @@ export default function ProductionDetailRoute() {
       consumptions={{ ...listControls(consumptions, consumptionSortColumns), items: consumptions.items }}
       updateProduction={(patch, stats) => workspace.updateProduction(production, patch, stats)}
       saveProduction={workspace.saveProduction}
+      discardProduction={workspace.discardProduction}
+      restoreProduction={workspace.restoreProduction}
       onRequestDelete={workspace.setPendingDelete}
       onBack={() => navigate(paths.productions)}
       onViewSales={() => navigate(paths.sales)}

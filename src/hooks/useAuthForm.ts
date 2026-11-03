@@ -3,7 +3,11 @@ import { isAxiosError } from "axios";
 import { useLocation, useMatch, useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 import { authService } from "../services/auth";
-import { getApiErrorMessage } from "../services/http";
+import {
+  getApiErrorMessage,
+  isDuplicateAccountError,
+} from "../services/http";
+import { showErrorToast } from "../components/ui/Notifications/toast";
 import type { UserSession } from "../domain/models";
 import { paths } from "../app/paths";
 
@@ -95,15 +99,39 @@ export function useAuthForm(onAuthenticated: (session: UserSession) => void) {
       const status = isAxiosError(requestError)
         ? requestError.response?.status
         : undefined;
+      const needsEmailConfirmation = status === 403 && mode === "login";
       if (
-        (status === 403 && mode === "login") ||
+        needsEmailConfirmation ||
         (status === 503 && mode === "register")
       ) {
         setNeedsConfirmation(true);
       }
-      toast.error(
-        getApiErrorMessage(requestError, "Não foi possível conectar à API."),
-      );
+      if (mode === "register" && isDuplicateAccountError(requestError)) {
+        showErrorToast("Este email já está cadastrado", {
+          description:
+            "Entre na conta existente ou use outro email para se cadastrar.",
+          action: {
+            label: "Fazer login",
+            onClick: () => {
+              switchMode("login");
+            },
+          },
+        });
+      } else if (needsEmailConfirmation) {
+        showErrorToast("Confirme seu email para entrar", {
+          description: "Reenvie o link de confirmação para ativar sua conta.",
+          action: {
+            label: "Reenviar confirmação",
+            onClick: () => {
+              void resendConfirmation();
+            },
+          },
+        });
+      } else {
+        toast.error(
+          getApiErrorMessage(requestError, "Não foi possível conectar à API."),
+        );
+      }
     } finally {
       setSubmitting(false);
     }

@@ -1,0 +1,36 @@
+.message {
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr);
+  align-items: start;
+  gap: 10px;
+  width: 100%;
+}
+
+.icon {
+  margin-top: 1px;
+  color: #bb6458;
+}
+
+.content {
+  display: grid;
+  gap: 5px;
+  color: #374139;
+}
+
+.content strong {
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+.content p {
+  margin: 0;
+  color: #68716a;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.action {
+  justify-self: start;
+  margin-top: 4px;
+}

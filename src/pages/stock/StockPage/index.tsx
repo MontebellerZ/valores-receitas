@@ -19,6 +19,7 @@ import MetricCard from "../../../components/ui/MetricCard";
 import Icon from "../../../components/ui/Icon";
 import IconButton from "../../../components/ui/IconButton";
 import ConfirmDeleteDialog from "../../../components/ui/ConfirmDeleteDialog";
+import { showErrorToast } from "../../../components/ui/Notifications/toast";
 import type { StockEntry, StockLot, StockLotItem, StockCorrection, StockField, StockTotal } from "../../../domain/models";
 import { localToday, money, number } from "../../../utils/format";
 
@@ -59,16 +60,25 @@ export default function StockPage({
   const editPurchase = (lot: StockLotItem) => {
     setBusy(true);
     void loadPurchase(lot.entryOrder).then(openEdit).catch(() => {
-      toast.error("Não foi possível carregar os pacotes desta compra.");
+      showErrorToast("Não foi possível carregar os pacotes desta compra", {
+        description:
+          "Tente novamente ou recarregue o estoque se o problema continuar.",
+      });
     }).finally(() => setBusy(false));
   };
   const openEdit = (lots: StockLot[]) => {
     if (!lots.length || lots.length > 1000) {
-      toast.error("A correção permite de 1 a 1.000 pacotes da mesma compra.");
+      showErrorToast("Compra fora do limite para correção", {
+        description:
+          "A edição conjunta aceita de 1 a 1.000 pacotes da mesma compra.",
+      });
       return;
     }
     if (lots.some((lot) => lot.entryOrder !== lots[0].entryOrder || lot.marketItemId !== lots[0].marketItemId)) {
-      toast.error("A edição conjunta permite apenas pacotes do mesmo insumo cadastrados na mesma compra.");
+      showErrorToast("Não é possível editar estes pacotes juntos", {
+        description:
+          "A edição conjunta exige pacotes do mesmo insumo e da mesma compra. Edite os demais separadamente.",
+      });
       return;
     }
     const { marketItemId, entryDate, packageQty, packagePrice } = lots[0];
@@ -167,7 +177,7 @@ export default function StockPage({
           onChange={(patch, item) => setEditing({ ...editing, value: { ...editing.value, ...patch }, item: item ?? editing.item })} />
         <FormField label="Motivo da correção"><FormControl required as="textarea" maxLength={500} value={editing.reason}
           onChange={(event) => setEditing({ ...editing, reason: event.target.value })} /></FormField>
-        <p className={styles["formula-note"]}>O novo saldo preserva todas as saídas já registradas. O preço corrigido vale para os próximos consumos; custos de produções e vendas anteriores não mudam. Pacotes usados em produção não podem trocar de insumo. Quantidade de pacotes não é alterada: registre compras faltantes, exclua pacotes extras sem movimentações ou dê baixa nos que possuem histórico.</p>
+        <p className={styles["formula-note"]}>O novo saldo preserva todas as saídas já registradas. Corrigir quantidade ou preço recalcula o custo de todos os consumos já feitos com o pacote, o custo das produções e o custo por pacote das vendas dessas produções; as quantidades consumidas não mudam. Pacotes usados em produção não podem trocar de insumo. Quantidade de pacotes não é alterada: registre compras faltantes, exclua pacotes extras sem movimentações ou dê baixa nos que possuem histórico.</p>
         <Panel title="Pacotes que serão corrigidos" variant="inset">
           <DataTable variant="compact"><thead><tr><th>Pacote</th><th>Preço atual → novo</th><th>Saldo atual → novo</th></tr></thead><tbody>
             {editing.lots.map((lot) => {

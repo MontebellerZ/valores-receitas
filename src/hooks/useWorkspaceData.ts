@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "react-toastify";
 import { isAxiosError } from "axios";
 import type {
-  MarketItem, Recipe, RecipeEdit, Production, Sale, StockEntry, StockCorrection, WorkspaceData, WorkspacePatch, WorkspaceSummary,
+  MarketItem, Recipe, RecipeEdit, Production, ProductionDiscard, Sale, StockEntry, StockCorrection, WorkspaceSummary,
 } from "../domain/models";
 import { workspaceService } from "../services/workspace";
 import { recipePatch } from "../domain/recipeEdits";
@@ -129,34 +129,61 @@ export function useWorkspaceData(userId: string) {
     }
   }, []);
 
-  /** Sends the pending edits plus `changes` as one atomic PATCH /data. */
+  /** Sends pending edits to the controller that owns each resource. */
   const persist = useCallback((changes: ChangeSet) => enqueue(async () => {
     if (blocked.current || revision.current === undefined)
       throw new Error("Recarregue os dados do servidor antes de salvar.");
     const pending = latest.current;
     const deletedMarket = unique(pending.deletedMarket, changes.deleted?.market);
     const edits = Object.values(pending.recipes).filter((edit) => !changes.deleted?.recipes?.includes(edit.recipe.id));
-    const body: WorkspacePatch = {
-      market: byId(Object.values(pending.market), changes.market)
+    const market = {
+      changed: byId(Object.values(pending.market), changes.market)
         .filter((item) => !deletedMarket.includes(item.id)).map(stripMarket),
-      ...recipePatch(edits, changes.recipes),
-      productions: byId(Object.values(pending.productions), changes.productions)
-        .filter((production) => !changes.deleted?.productions?.includes(production.id)),
-      sales: changes.sales ?? [],
-      deleted: {
-        market: deletedMarket,
-        recipes: unique(changes.deleted?.recipes),
-        productions: unique(changes.deleted?.productions),
-        sales: unique(changes.deleted?.sales),
-      },
-      revision: revision.current,
+      deleted: deletedMarket,
     };
-    const nothing = !body.market.length && !body.recipes.length && !body.productions.length && !body.sales.length &&
-      !Object.values(body.deleted).some((ids) => ids.length);
+    const recipe = {
+      ...recipePatch(edits, changes.recipes),
+      deleted: unique(changes.deleted?.recipes),
+    };
+    const productions = {
+      changed: byId(Object.values(pending.productions), changes.productions)
+        .filter((production) => !changes.deleted?.productions?.includes(production.id)),
+      deleted: unique(changes.deleted?.productions),
+    };
+    const sales = { changed: changes.sales ?? [], deleted: unique(changes.deleted?.sales) };
+    const hasMarketChanges = market.changed.length > 0 || market.deleted.length > 0;
+    const hasRecipeChanges = recipe.changed.length > 0 || recipe.deleted.length > 0 || (recipe.deletedIngredients?.length ?? 0) > 0;
+    const hasProductionChanges = productions.changed.length > 0 || productions.deleted.length > 0;
+    const hasSaleChanges = sales.changed.length > 0 || sales.deleted.length > 0;
+    const nothing = !hasMarketChanges && !hasRecipeChanges && !hasProductionChanges && !hasSaleChanges;
     if (nothing) return null;
     setApiStatus("saving");
-    const saved = await workspaceService.patch(body);
-    revision.current = saved.revision;
+    let didWrite = false;
+    try {
+      if (hasMarketChanges) {
+        const saved = await workspaceService.patchMarket({ ...market, revision: revision.current });
+        revision.current = saved.revision;
+        didWrite = true;
+      }
+      if (hasRecipeChanges) {
+        const saved = await workspaceService.patchRecipes({ ...recipe, revision: revision.current });
+        revision.current = saved.revision;
+        didWrite = true;
+      }
+      if (hasProductionChanges) {
+        const saved = await workspaceService.patchProductions({ ...productions, revision: revision.current });
+        revision.current = saved.revision;
+        didWrite = true;
+      }
+      if (hasSaleChanges) {
+        const saved = await workspaceService.patchSales({ ...sales, revision: revision.current });
+        revision.current = saved.revision;
+        didWrite = true;
+      }
+    } catch (error) {
+      if (didWrite) await afterWrite();
+      throw error;
+    }
     // Edits made while the request was in flight stay pending.
     if (latest.current === pending) setDrafts(emptyDrafts);
     else setDrafts({
@@ -168,7 +195,7 @@ export function useWorkspaceData(userId: string) {
     });
     setApiStatus("connected");
     await afterWrite();
-    return saved;
+    return { revision: revision.current };
   }), [enqueue, afterWrite, setDrafts]);
 
   const hasUnsavedChanges = !isLoading && !isEmptyDrafts(drafts);
@@ -234,10 +261,12 @@ export function useWorkspaceData(userId: string) {
   const latestDrafts = () => latest.current;
   const discardChanges = () => setDrafts(emptyDrafts);
 
-  const stockMutation = async (action: (version: number) => Promise<{ revision: number }>) => {
+  /** Runs one explicit server action with the current revision and keeps the returned revision. */
+  const revisionMutation = async (action: (version: number) => Promise<{ revision: number }>, blockedMessage: string,
+    businessErrorMessage?: string) => {
     try {
       await enqueue(async () => {
-        if (blocked.current || revision.current === undefined) throw new Error("Recarregue a página antes de alterar o estoque.");
+        if (blocked.current || revision.current === undefined) throw new Error(blockedMessage);
         setApiStatus("saving");
         const result = await action(revision.current);
         if (typeof result?.revision !== "number") throw new Error("A API não informou a nova revisão dos dados.");
@@ -246,10 +275,19 @@ export function useWorkspaceData(userId: string) {
         await afterWrite();
       });
     } catch (error) {
-      reportError(error);
+      // Business rejections are shown without blocking unrelated work; conflicts and outages still block.
+      if (businessErrorMessage === undefined || isBlockingError(error)) reportError(error);
+      else {
+        setApiStatus("connected");
+        toast.error(getApiErrorMessage(error, businessErrorMessage));
+      }
       throw error;
     }
   };
+  const stockMutation = (action: (version: number) => Promise<{ revision: number }>) =>
+    revisionMutation(action, "Recarregue a página antes de alterar o estoque.");
+  const productionMutation = (action: (version: number) => Promise<{ revision: number }>, errorMessage: string) =>
+    revisionMutation(action, "Recarregue a página antes de alterar a produção.", errorMessage);
 
   const saveProduction = async (production: Production) => {
     try {
@@ -265,12 +303,9 @@ export function useWorkspaceData(userId: string) {
     }
   };
 
-  /** Explicit bulk read for workbook export/import only. */
-  const loadAll = (): Promise<WorkspaceData> => workspaceService.load();
-
   return {
     summary, drafts, dataVersion, apiStatus, isLoading, hasUnsavedChanges, saveChanges, isDirty, discardChanges,
-    commitChange, stage, stageMarketDelete, loadAll, latestDrafts,
+    commitChange, stage, stageMarketDelete, latestDrafts,
     canManageStock: !isLoading && canManage,
     canSave: !isLoading && canManage,
     addStock: (entry: StockEntry) => stockMutation((version) => workspaceService.addStock(entry, version)),
@@ -278,6 +313,12 @@ export function useWorkspaceData(userId: string) {
     deleteStock: (id: string) => stockMutation((version) => workspaceService.deleteStock(id, version)),
     adjustStock: (id: string, remaining: number, reason: string) =>
       stockMutation((version) => workspaceService.adjustStock(id, remaining, reason, version)),
+    discardProduction: (id: string, discard: ProductionDiscard) =>
+      productionMutation((version) => workspaceService.discardProduction(id, discard, version),
+        "Não foi possível descartar a produção."),
+    restoreProduction: (id: string) =>
+      productionMutation((version) => workspaceService.restoreProduction(id, version),
+        "Não foi possível desfazer o descarte da produção."),
     saveProduction,
   };
 }

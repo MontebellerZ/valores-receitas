@@ -118,6 +118,11 @@
   gap: 2px;
 }
 
+.profile > div:nth-child(2) {
+  flex: 1;
+  min-width: 0;
+}
+
 .sync-status strong,
 .profile strong {
   font-size: 11px;
@@ -158,6 +163,11 @@
   padding: 17px 6px 4px;
 }
 
+.profile > button,
+.avatar {
+  flex: 0 0 auto;
+}
+
 .avatar {
   display: grid;
   place-items: center;
@@ -193,12 +203,6 @@
 .breadcrumb span {
   padding: 0 9px;
   color: #c7cbc4;
-}
-
-.topbar-actions {
-  display: flex;
-  align-items: center;
-  gap: 18px;
 }
 
 .page-wrap {
@@ -325,6 +329,9 @@
 .sync-status strong,
 .profile strong {
   font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .sync-status small,

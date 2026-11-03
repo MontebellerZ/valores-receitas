@@ -38,7 +38,7 @@ export default function ConfirmDeleteDialog({
             : pendingDelete.kind === "recipe"
             ? `A receita “${pendingDelete.label}” será excluída permanentemente.`
             : pendingDelete.kind === "production"
-              ? `O registro de produção “${pendingDelete.label}” será removido do histórico.`
+              ? `O registro de produção “${pendingDelete.label}” será excluído e os insumos consumidos voltarão ao estoque. Se a produção foi realmente feita e perdida, use “Descartar produção” para manter o custo e o consumo.`
               : pendingDelete.kind === "sale"
                 ? `A venda “${pendingDelete.label}” será excluída. Os pacotes voltarão ao saldo disponível e os totais de vendas serão recalculados.`
                 : pendingDelete.kind === "market"

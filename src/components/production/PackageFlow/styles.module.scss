@@ -32,6 +32,10 @@
   background: #c9dccd;
 }
 
+.discarded {
+  background: #8a8f88;
+}
+
 .legend {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));

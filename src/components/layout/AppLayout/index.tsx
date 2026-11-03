@@ -1,5 +1,4 @@
 import IconButton from "../../ui/IconButton";
-import Button from "../../ui/Button";
 import styles from "./styles.module.scss";
 import type { ReactNode } from "react";
 import { LogOut, ShoppingBag } from "lucide-react";
@@ -19,7 +18,6 @@ type Props = {
   marketCount: number;
   children: ReactNode;
   signOut: () => void;
-  exportWorkbook: () => void;
   hasUnsavedChanges: boolean;
 };
 
@@ -32,7 +30,6 @@ export default function AppLayout({
   marketCount,
   children,
   signOut,
-  exportWorkbook,
   hasUnsavedChanges,
 }: Props) {
   const { pathname } = useLocation();
@@ -169,11 +166,6 @@ export default function AppLayout({
                 <span>/</span> {saleEdit ? "Editar venda" : "Registrar venda"}
               </>
             )}
-          </div>
-          <div className={styles["topbar-actions"]}>
-            <Button variant="text" onClick={exportWorkbook}>
-              <Icon name="download" size={16} /> Exportar Excel
-            </Button>
           </div>
         </header>
         <div className={styles["page-wrap"]}>{children}</div>

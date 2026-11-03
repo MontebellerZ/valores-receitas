@@ -11,9 +11,11 @@ import { asNumber } from "../../../utils/parsing";
 
 export default function SalePriceSimulation({
   result,
+  disabled = false,
   onPriceChange,
 }: {
   result: CalculatedProduction;
+  disabled?: boolean;
   onPriceChange: (price: number | undefined) => void;
 }) {
   const inputId = useId();
@@ -49,6 +51,7 @@ export default function SalePriceSimulation({
         
         <FormControl
           id={inputId}
+          disabled={disabled}
           type="text"
           inputMode="decimal"
           placeholder={moneyInputValue(result.salePrice)}

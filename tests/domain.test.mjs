@@ -2,14 +2,11 @@ import assert from "node:assert/strict";
 import { after, before, test } from "node:test";
 import { fileURLToPath } from "node:url";
 import { createServer } from "vite";
-import XLSX from "xlsx";
 
 let server;
 let calculations;
 let rules;
 let overview;
-let storage;
-let workbookService;
 let navigation;
 let productionReport;
 
@@ -63,8 +60,6 @@ before(async () => {
   calculations = await server.ssrLoadModule("/src/domain/calculations.ts");
   rules = await server.ssrLoadModule("/src/domain/workspaceRules.ts");
   overview = await server.ssrLoadModule("/src/domain/overview.ts");
-  storage = await server.ssrLoadModule("/src/services/storage.ts");
-  workbookService = await server.ssrLoadModule("/src/services/workbook.ts");
   navigation = await server.ssrLoadModule("/src/app/paths.ts");
   productionReport = await server.ssrLoadModule("/src/domain/productionReport.ts");
 });
@@ -254,6 +249,42 @@ test("production report summarizes server totals into package destinations, yiel
   assert.equal(productionReport.buildProductionReport({ ...calculated, lostPackages: 6 }, empty).status, "closed");
 });
 
+test("discarded productions keep cost but have no sellable packages, edits or sales", () => {
+  const discarded = { ...production, lostPackages: 2, discardedAt: "2026-10-18", discardReason: "Massa desandou" };
+  const calculated = calculations.calculateProduction(discarded);
+  assert.equal(calculated.packages, 6);
+  assert.equal(calculated.cost, calculations.calculateProduction(production).cost);
+  assert.equal(calculations.remainingPackages(calculated), 0);
+  assert.equal(calculated.revenue, 0);
+  assert.equal(calculated.profit, -calculated.cost);
+  assert.match(rules.prepareSale(draft, calculated, 0).error, /descartada/);
+  assert.match(rules.validateProductionUpdate(discarded, { margin: 80 }, stats(0)), /descartadas não podem ser alteradas/);
+
+  const empty = { ...totals, salesCount: 0, outPackages: 0, donatedPackages: 0, revenue: 0, received: 0, pending: 0, firstSaleDate: null };
+  const report = productionReport.buildProductionReport(calculated, empty);
+  assert.equal(report.status, "discarded");
+  assert.deepEqual([report.lostPackages, report.discardedPackages, report.availablePackages], [2, 4, 0]);
+  assert.ok(Math.abs(report.giveawayCost - 6 * calculated.costPerPackage) < 1e-9);
+  assert.ok(Math.abs(report.missedRevenue - 6 * calculated.salePrice) < 1e-9);
+  assert.equal(report.projectedRevenue, 0);
+  assert.equal(productionReport.buildProductionReport(calculations.calculateProduction(production), empty).discardedPackages, 0);
+});
+
+test("production discard requires a saved, unsold production, a valid date and a reason", () => {
+  const discard = { date: "2026-10-16", reason: "Lote contaminado" };
+  assert.equal(rules.validateProductionDiscard(production, discard), undefined);
+  assert.equal(rules.validateProductionDiscard(production, discard, 0), undefined);
+  assert.equal(rules.validateProductionDiscard(production, { ...discard, reason: "x".repeat(500) }), undefined);
+  assert.match(rules.validateProductionDiscard({ ...production, quantity: 0 }, discard), /Salve a produção/);
+  assert.match(rules.validateProductionDiscard({ ...production, discardedAt: "2026-10-17" }, discard), /já foi descartada/);
+  assert.match(rules.validateProductionDiscard(production, discard, 1), /pacotes perdidos/);
+  assert.match(rules.validateProductionDiscard(production, { ...discard, date: "2026-10-15" }), /data da produção ou depois/);
+  for (const date of ["", "16/10/2026", "2026-13-40"])
+    assert.match(rules.validateProductionDiscard(production, { ...discard, date }), /data do descarte/);
+  for (const reason of ["", "   ", "x".repeat(501)])
+    assert.match(rules.validateProductionDiscard(production, { ...discard, reason }), /motivo do descarte/);
+});
+
 test("daily report pages keep the server accumulated revenue, fill short gaps and compute expiration", () => {
   const row = (date, sold, revenue, cumulativeRevenue) =>
     ({ date, sold, donated: 0, total: sold, revenue, cumulativeRevenue });
@@ -288,73 +319,4 @@ test("financial summaries and periods retain their results", () => {
     "2026-10-10",
   );
   assert.equal(overview.periodStart("all", new Date(2026, 9, 16)), "");
-});
-
-test("storage keeps account caches separate and handles invalid JSON", () => {
-  const original = Object.getOwnPropertyDescriptor(globalThis, "localStorage");
-  const memory = new Map();
-  Object.defineProperty(globalThis, "localStorage", {
-    configurable: true,
-    value: {
-      getItem: (key) => memory.get(key) ?? null,
-      setItem: (key, value) => memory.set(key, value),
-    },
-  });
-  try {
-    const snapshot = {
-      market: [item],
-      recipes: [recipe],
-      productions: [production],
-      sales: [],
-    };
-    storage.writeSavedData("test-user", snapshot);
-    assert.equal(storage.readSavedData("test-user").market[0].id, item.id);
-    assert.equal("packageQty" in storage.readSavedData("test-user").market[0], false);
-    assert.equal("packagePrice" in storage.readSavedData("test-user").market[0], false);
-    memory.set("legacy", JSON.stringify({ market: [item], recipes: [{ ...recipe, quantity: 2 }] }));
-    assert.equal(storage.readSavedData("legacy").productions[0].ingredientCostPerBatch, 5);
-    assert.equal(storage.readSavedData("other-user").market.length, 0);
-    assert.equal(storage.hasLegacyMigration(), false);
-    storage.markLegacyMigrated();
-    assert.equal(storage.hasLegacyMigration(), true);
-    memory.set("invalid-json", "{");
-    assert.equal(storage.readSavedData("invalid-json").recipes.length, 0);
-  } finally {
-    if (original) Object.defineProperty(globalThis, "localStorage", original);
-    else delete globalThis.localStorage;
-  }
-});
-
-test("XLSX import links recipe ingredients to imported market items", async () => {
-  const workbook = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(
-    workbook,
-    XLSX.utils.json_to_sheet([
-      { Item: "Farinha", Unidade: "g", "Qtd pacote": 1000, "Valor pacote": 10 },
-    ]),
-    "Mercado",
-  );
-  XLSX.utils.book_append_sheet(
-    workbook,
-    XLSX.utils.json_to_sheet([
-      {
-        Receita: "Pao",
-        Rendimento: 10,
-        Item: "Farinha",
-        "Quantidade ingrediente": 500,
-      },
-    ]),
-    "Receitas",
-  );
-  const bytes = XLSX.write(workbook, { type: "array", bookType: "xlsx" });
-  const imported = await workbookService.importWorkbook(
-    new File([bytes], "test.xlsx"),
-  );
-  assert.equal(imported.market.length, 1);
-  assert.equal(imported.recipes.length, 1);
-  assert.equal(
-    imported.recipes[0].ingredients[0].marketItemId,
-    imported.market[0].id,
-  );
-  assert.equal(imported.recipes[0].ingredients[0].quantity, 500);
 });

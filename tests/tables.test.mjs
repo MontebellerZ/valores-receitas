@@ -138,7 +138,7 @@ test("all table consumers expose server-sortable data columns while preserving a
     sales: { count: 1, packages: 2, revenue: 6, received: 6, pending: 0, pendingCount: 0, cost: 1, profit: 5 },
     availablePackages: 8, productionCost: 5, producedPackages: 10, lostPackages: 0,
     productions: { count: 1, soldPackages: 2, donatedPackages: 0, losses: 0, remainingRevenue: 8, remainingCost: 4,
-      expectedRevenue: 10, referenceRevenue: 10, referenceProfit: 5 },
+      expectedRevenue: 10, referenceRevenue: 10, referenceProfit: 5, discardedPackages: 0, discardedCost: 0 },
   };
   const noop = () => {};
   const salesProps = (items) => ({

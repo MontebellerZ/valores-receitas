@@ -28,7 +28,6 @@ export default function Workspace({ session, signOut }: Props) {
         salesCount={workspace.counts.sales}
         marketCount={workspace.counts.market}
         signOut={requestSignOut}
-        exportWorkbook={() => void workspace.exportWorkbook()}
       >
         {workspace.hasUnsavedChanges && (
           <UnsavedChangesBar

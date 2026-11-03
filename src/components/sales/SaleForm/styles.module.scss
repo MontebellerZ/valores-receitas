@@ -16,10 +16,6 @@
   min-width: 0;
 }
 
-.sales-cart-modal {
-  width: min(100%, 980px);
-}
-
 .sales-cart-layout {
   grid-template-columns: minmax(0, 1fr) 290px;
   align-items: stretch;

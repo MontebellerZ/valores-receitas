@@ -1,4 +1,4 @@
-import type { Ingredient, Recipe, RecipeEdit, RecipeListItem, WorkspacePatch } from "./models";
+import type { Ingredient, Recipe, RecipeEdit, RecipeListItem, RecipesPatchRequest } from "./models";
 
 /**
  * Pending edits of saved recipes, keyed by recipe id. Every change to one recipe, on any ingredient
@@ -68,12 +68,12 @@ export function editedIngredients(edits: RecipeEdits, recipeId: string, page: In
 }
 
 /**
- * Recipe part of PATCH /data. Partial edits send only touched rows with `partialRecipeIngredients`;
- * whole recipes (registration, import) replace the ingredient lists and cannot be mixed with them.
+ * Recipe-specific partial updates send only touched rows with `partialRecipeIngredients`;
+ * whole recipes replace the ingredient lists and cannot be mixed with them.
  */
 export function recipePatch(edits: RecipeEdit[], whole: Recipe[] = []):
-  Pick<WorkspacePatch, "recipes" | "partialRecipeIngredients" | "deletedIngredients"> {
-  if (!edits.length) return { recipes: whole };
+  Pick<RecipesPatchRequest, "changed" | "partialRecipeIngredients" | "deletedIngredients"> {
+  if (!edits.length) return { changed: whole };
   if (whole.length) throw new Error("Salve ou descarte as alterações das receitas antes de continuar.");
   const byRecipe = new Map<string, RecipeEdit>();
   for (const edit of edits) {
@@ -81,7 +81,7 @@ export function recipePatch(edits: RecipeEdit[], whole: Recipe[] = []):
     byRecipe.set(edit.recipe.id, edit);
   }
   return {
-    recipes: edits.map((edit) => edit.recipe),
+    changed: edits.map((edit) => edit.recipe),
     partialRecipeIngredients: true,
     deletedIngredients: [...new Set(edits.flatMap((edit) => edit.deletedIngredients))],
   };

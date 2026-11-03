@@ -17,11 +17,13 @@ export function recipeCostPerBatch(recipe: Recipe, market: LegacyMarketItemCost[
   }, 0);
 }
 
-/** Pacotes que ainda podem ser vendidos, descontando os perdidos e os já vendidos. */
+/** Pacotes que ainda podem ser vendidos, descontando os perdidos e os já vendidos. Produções descartadas não têm saldo. */
 export const remainingPackages = (
-  production: { packages: number; lostPackages?: number },
+  production: { packages: number; lostPackages?: number; discardedAt?: string | null },
   sold = 0,
-) => Math.max(0, production.packages - (production.lostPackages ?? 0) - sold);
+) => production.discardedAt ? 0 : Math.max(0, production.packages - (production.lostPackages ?? 0) - sold);
+
+export const isDiscarded = (production: { discardedAt?: string | null }) => Boolean(production.discardedAt);
 
 export function calculateProduction(
   production: Production,
@@ -36,7 +38,7 @@ export function calculateProduction(
   const markupPercent = Math.max(production.margin, 0);
   const salePrice =
     costPerPackage > 0 ? costPerPackage * (1 + markupPercent / 100) : 0;
-  const revenue = salePrice * remainingPackages({ packages, lostPackages: production.lostPackages });
+  const revenue = salePrice * remainingPackages({ packages, lostPackages: production.lostPackages, discardedAt: production.discardedAt });
   const profit = revenue - cost;
   return {
     ...production,

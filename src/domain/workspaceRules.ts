@@ -1,10 +1,11 @@
 import type {
   CalculatedProduction,
   Production,
+  ProductionDiscard,
   Sale,
   SaleDraft,
 } from "./models";
-import { calculateProduction, remainingPackages } from "./calculations";
+import { calculateProduction, isDiscarded, remainingPackages } from "./calculations";
 import { makeId, number } from "../utils/format";
 
 /** Agregados das vendas de uma produção, calculados pelo servidor. */
@@ -19,6 +20,8 @@ export function validateProductionUpdate(
   patch: Partial<Production>,
   stats: ProductionSalesStats,
 ) {
+  if (isDiscarded(production))
+    return "Produções descartadas não podem ser alteradas. Desfaça o descarte para editá-la.";
   if (production.quantity > 0 &&
       ((patch.recipeId !== undefined && patch.recipeId !== production.recipeId) ||
        (patch.quantity !== undefined && patch.quantity !== production.quantity))) {
@@ -51,6 +54,27 @@ export function validateProductionUpdate(
 
 type SaleResult =
   { sale: Sale; error?: never } | { sale?: never; error: string };
+
+export const MAX_DISCARD_REASON_LENGTH = 500;
+
+/** Validates the total discard of a saved production before asking the server. */
+export function validateProductionDiscard(
+  production: Production,
+  discard: ProductionDiscard,
+  salesCount?: number,
+) {
+  if (production.quantity <= 0) return "Salve a produção antes de descartá-la.";
+  if (isDiscarded(production)) return "Esta produção já foi descartada.";
+  if (salesCount !== undefined && salesCount > 0)
+    return "Esta produção possui vendas. Para perdas parciais, informe os pacotes perdidos.";
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(discard.date) || !Number.isFinite(new Date(`${discard.date}T12:00:00`).getTime()))
+    return "Informe a data do descarte.";
+  if (production.date && discard.date < production.date)
+    return "O descarte deve ocorrer na data da produção ou depois dela.";
+  const reason = discard.reason.trim();
+  if (!reason || reason.length > MAX_DISCARD_REASON_LENGTH)
+    return `Informe o motivo do descarte (até ${MAX_DISCARD_REASON_LENGTH} caracteres).`;
+}
 
 /** Produção candidata a venda com o total já vendido por todas as vendas gravadas. */
 export type SaleTarget = { production: CalculatedProduction; soldPackages: number };
@@ -91,6 +115,8 @@ export function prepareSale(
     return { error: "A produção selecionada não está disponível." };
   if (production.quantity <= 0)
     return { error: "Salve a produção e consuma o estoque antes de registrar vendas." };
+  if (isDiscarded(production))
+    return { error: "Esta produção foi descartada e não aceita vendas." };
   if (draft.id && (!existing || existing.id !== draft.id))
     return { error: "Esta venda não está mais disponível." };
   if (

@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import OverviewPage from "../../../pages/overview/OverviewPage";
-import ImportWorkbookButton from "../../../components/workbook/ImportWorkbookButton";
 import { useWorkspaceContext } from "../../../hooks/useWorkspaceContext";
 import { useResource } from "../../../hooks/useResource";
 import { useSalesReport } from "../../../hooks/useSalesReport";
@@ -56,9 +55,6 @@ export default function OverviewRoute() {
       onViewSales={() => navigate(paths.sales)}
       onViewProduction={(id) =>
         navigate(id ? paths.production(id) : paths.productions)
-      }
-      importAction={
-        <ImportWorkbookButton onImport={workspace.importWorkbook} />
       }
     />
   );

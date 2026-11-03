@@ -75,6 +75,8 @@ const normalizeProduction = (production: Production): Production => ({
   ...production,
   expectedSalePrice: production.expectedSalePrice ?? undefined,
   lostPackages: production.lostPackages ?? 0,
+  discardedAt: typeof production.discardedAt === "string" && production.discardedAt ? production.discardedAt.slice(0, 10) : null,
+  discardReason: production.discardReason ?? null,
 });
 
 const mapPage = <T, R>(page: Page<T>, map: (item: T) => R): Page<R> => ({ ...page, items: page.items.map(map) });
@@ -120,7 +122,7 @@ export function toSummary(raw: unknown): WorkspaceSummary {
     sales: requireNumbers(raw.sales, ["count", "packages", "revenue", "received", "pending", "pendingCount", "cost", "profit"] as const, "resumo.sales"),
     ...requireNumbers(raw, ["availablePackages", "productionCost", "producedPackages", "lostPackages"] as const, "resumo"),
     productions: requireNumbers(raw.productions, ["count", "soldPackages", "donatedPackages", "losses", "remainingRevenue", "remainingCost",
-      "expectedRevenue", "referenceRevenue", "referenceProfit"] as const, "resumo.productions"),
+      "expectedRevenue", "referenceRevenue", "referenceProfit", "discardedPackages", "discardedCost"] as const, "resumo.productions"),
   };
 }
 
@@ -193,76 +195,76 @@ function toStockLot(raw: StockLotItem): StockLotItem {
 
 export const queryService = {
   async salesReport(params: ListRequest, signal?: AbortSignal) {
-    const { data } = await api.get<unknown>("/query/sales-report", { params: cleanParams(params), signal });
+    const { data } = await api.get<unknown>("/sales/report", { params: cleanParams(params), signal });
     return toSalesReport(data);
   },
   async summary(range: DateRange = {}, signal?: AbortSignal) {
-    const { data } = await api.get<unknown>("/query/summary", { params: cleanParams(range), signal });
+    const { data } = await api.get<unknown>("/summary", { params: cleanParams(range), signal });
     return toSummary(data);
   },
   async market(params: ListRequest, signal?: AbortSignal) {
-    return mapPage(await list<MarketListItem>("/query/market", params, signal), toMarketItem);
+    return mapPage(await list<MarketListItem>("/market", params, signal), toMarketItem);
   },
   async marketByIds(ids: string[], signal?: AbortSignal) {
     const unique = lookupIds(ids);
     if (!unique.length) return [];
-    const page = await list<MarketListItem>("/query/market", { page: 1, pageSize: 100, ids: unique.join(",") }, signal);
+    const page = await list<MarketListItem>("/market", { page: 1, pageSize: 100, ids: unique.join(",") }, signal);
     return page.items.map(toMarketItem);
   },
   async marketItem(id: string, signal?: AbortSignal) {
-    const item = await detail<MarketListItem>(`/query/market/${encodeURIComponent(id)}`, signal);
+    const item = await detail<MarketListItem>(`/market/${encodeURIComponent(id)}`, signal);
     return item && toMarketItem(item);
   },
   /** Lean list: ingredients come empty and only ingredientCount is informed. */
   async recipes(params: ListRequest, signal?: AbortSignal) {
-    return mapPage(await list<RecipeListItem>("/query/recipes", params, signal), toRecipeItem);
+    return mapPage(await list<RecipeListItem>("/recipes", params, signal), toRecipeItem);
   },
   async recipesByIds(ids: string[], signal?: AbortSignal) {
     const unique = lookupIds(ids);
     if (!unique.length) return [];
-    const page = await list<RecipeListItem>("/query/recipes", { page: 1, pageSize: 100, ids: unique.join(",") }, signal);
+    const page = await list<RecipeListItem>("/recipes", { page: 1, pageSize: 100, ids: unique.join(",") }, signal);
     return page.items.map(toRecipeItem);
   },
   recipeIngredients: (id: string, params: ListRequest, signal?: AbortSignal) =>
-    list<Ingredient>(`/query/recipes/${encodeURIComponent(id)}/ingredients`, params, signal),
+    list<Ingredient>(`/recipes/${encodeURIComponent(id)}/ingredients`, params, signal),
   /** Lean recipe for editing: metadata and ingredientCount; ingredients are paged separately. */
   async recipeMetadata(id: string, signal?: AbortSignal) {
-    const recipe = await detail<RecipeListItem>(`/query/recipes/${encodeURIComponent(id)}/metadata`, signal);
+    const recipe = await detail<RecipeListItem>(`/recipes/${encodeURIComponent(id)}/metadata`, signal);
     return recipe && toRecipeItem(recipe);
   },
   async productions(params: ListRequest, signal?: AbortSignal) {
-    return mapPage(await list<Production>("/query/productions", params, signal), normalizeProduction);
+    return mapPage(await list<Production>("/productions", params, signal), normalizeProduction);
   },
   async production(id: string, signal?: AbortSignal) {
-    const production = await detail<Production>(`/query/productions/${encodeURIComponent(id)}`, signal);
+    const production = await detail<Production>(`/productions/${encodeURIComponent(id)}`, signal);
     return production && normalizeProduction(production);
   },
   async report(id: string, params: Pick<PageRequest, "page" | "pageSize">, signal?: AbortSignal) {
-    const { data } = await api.get<unknown>(`/query/productions/${encodeURIComponent(id)}/report`, { params, signal });
+    const { data } = await api.get<unknown>(`/productions/${encodeURIComponent(id)}/report`, { params, signal });
     return toReport(data);
   },
   consumptions: (id: string, params: ListRequest, signal?: AbortSignal) =>
-    list<StockConsumption>(`/query/productions/${encodeURIComponent(id)}/consumptions`, params, signal),
-  sales: (params: ListRequest, signal?: AbortSignal) => list<Sale>("/query/sales", params, signal),
+    list<StockConsumption>(`/productions/${encodeURIComponent(id)}/consumptions`, params, signal),
+  sales: (params: ListRequest, signal?: AbortSignal) => list<Sale>("/sales", params, signal),
   /** Sales of one production; each item must carry the production's accumulated revenue. */
   async productionSales(productionId: string, params: ListRequest, signal?: AbortSignal) {
     if (!productionId) throw new Error("Informe a produção das vendas.");
-    const page = await list<Sale & { cumulativeRevenue?: unknown }>("/query/sales", { ...params, productionId }, signal);
+    const page = await list<Sale & { cumulativeRevenue?: unknown }>("/sales", { ...params, productionId }, signal);
     return mapPage(page, (sale): ProductionSale =>
       ({ ...sale, cumulativeRevenue: requireNumber(sale.cumulativeRevenue, "venda.cumulativeRevenue") }));
   },
-  sale: (id: string, signal?: AbortSignal) => detail<Sale>(`/query/sales/${encodeURIComponent(id)}`, signal),
+  sale: (id: string, signal?: AbortSignal) => detail<Sale>(`/sales/${encodeURIComponent(id)}`, signal),
   async balances(params: ListRequest, signal?: AbortSignal) {
-    return mapPage(await list<unknown>("/query/balances", params, signal), toBalance);
+    return mapPage(await list<unknown>("/productions/balances", params, signal), toBalance);
   },
   async balance(id: string, signal?: AbortSignal) {
-    const raw = await detail<unknown>(`/query/balances/${encodeURIComponent(id)}`, signal);
+    const raw = await detail<unknown>(`/productions/balances/${encodeURIComponent(id)}`, signal);
     return raw === null ? null : toBalance(raw);
   },
   async stock(params: ListRequest, signal?: AbortSignal) {
-    return mapPage(await list<StockLotItem>("/query/stock", params, signal), toStockLot);
+    return mapPage(await list<StockLotItem>("/stock", params, signal), toStockLot);
   },
-  stockTotals: (params: ListRequest, signal?: AbortSignal) => list<StockTotal>("/query/stock-totals", params, signal),
+  stockTotals: (params: ListRequest, signal?: AbortSignal) => list<StockTotal>("/stock/totals", params, signal),
   /** Explicit bulk read used only when the user edits a whole purchase (up to 1.000 packages). */
   async purchaseLots(entryOrder: number, signal?: AbortSignal) {
     const lots: StockLotItem[] = [];

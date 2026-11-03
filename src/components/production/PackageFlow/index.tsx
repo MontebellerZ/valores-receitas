@@ -20,6 +20,9 @@ export default function PackageFlow({ production, report, topBuyers, disabled = 
     { key: "donated", label: "Doados", value: report.donatedPackages, className: styles.donated },
     { key: "lost", label: "Perdidos", value: report.lostPackages, className: styles.lost },
     { key: "available", label: "Disponíveis", value: report.availablePackages, className: styles.available },
+    ...(report.discardedPackages > 0
+      ? [{ key: "discarded", label: "Descartados", value: report.discardedPackages, className: styles.discarded }]
+      : []),
   ];
   const description = segments.map((segment) => `${segment.label}: ${number(segment.value)}`).join(", ");
 
@@ -44,7 +47,8 @@ export default function PackageFlow({ production, report, topBuyers, disabled = 
           value={production.lostPackages ?? 0}
           onChange={(event) => onLostChange(event.target.value === "" ? 0 : Number(event.target.value))} />
       </FormField>
-      <p>Pacotes prontos que venceram, foram roubados ou descartados. Eles deixam de ficar disponíveis para venda.</p>
+      <p>Pacotes prontos que venceram, foram roubados ou descartados. Eles deixam de ficar disponíveis para venda.
+        Se a produção inteira foi perdida antes de qualquer venda, use "Descartar produção".</p>
     </div>
     <section className={styles.ranking} aria-label="Top 5 compradores desta produção">
       <h3>Top 5 compradores</h3>

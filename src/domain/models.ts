@@ -40,7 +40,16 @@ export type Production = {
   lostPackages?: number;
   /** Produção avulsa: não consome estoque e usa custo total informado manualmente. */
   isStandalone?: boolean;
+  /**
+   * Data (yyyy-MM-dd) do descarte total da produção. Somente leitura: o PATCH ignora e o descarte
+   * usa endpoints próprios. Produções descartadas mantêm custo e consumo, mas não têm pacotes à venda.
+   */
+  discardedAt?: string | null;
+  /** Motivo informado no descarte; somente leitura. */
+  discardReason?: string | null;
 };
+
+export type ProductionDiscard = { date: string; reason: string };
 
 export type StockLot = {
   id: string;
@@ -113,13 +122,17 @@ export type SaleDraft = Pick<
   | "notes"
 > & { id?: string };
 export type UserSession = { id: string; email: string };
-export type WorkspaceData = {
-  market: MarketItem[];
-  recipes: Recipe[];
-  productions: Production[];
-  sales: Sale[];
-  revision?: number;
+export type WorkspaceRevision = { revision: number };
+export type MarketItemsPatchRequest = { changed: MarketItem[]; deleted: string[]; revision: number };
+export type RecipesPatchRequest = {
+  changed: Recipe[];
+  deleted: string[];
+  revision: number;
+  partialRecipeIngredients?: true;
+  deletedIngredients?: string[];
 };
+export type ProductionsPatchRequest = { changed: Production[]; deleted: string[]; revision: number };
+export type SalesPatchRequest = { changed: Sale[]; deleted: string[]; revision: number };
 export type SyncStatus = "connecting" | "saving" | "connected" | "error";
 export type SalesProduction = {
   id: string;
@@ -192,6 +205,10 @@ export type WorkspaceSummary = {
     expectedRevenue: number;
     referenceRevenue: number;
     referenceProfit: number;
+    /** Pacotes formados pelas produções descartadas do período. */
+    discardedPackages: number;
+    /** Custo das produções descartadas do período. */
+    discardedCost: number;
   };
 };
 
@@ -235,19 +252,6 @@ export type SalesReport = {
 export type ProductionReportPage = ProductionSalesTotals & {
   daily: Page<ProductionDayRow>;
   topBuyers: ProductionBuyer[];
-};
-
-export type WorkspacePatch = {
-  market: MarketItem[];
-  recipes: Recipe[];
-  productions: Production[];
-  sales: Sale[];
-  deleted: { market: string[]; recipes: string[]; productions: string[]; sales: string[] };
-  revision: number;
-  /** When true, each recipe's `ingredients` are upserts: unsent ingredients are preserved on the server. */
-  partialRecipeIngredients?: true;
-  /** Ingredient ids removed from the submitted recipes; only sent with `partialRecipeIngredients`. */
-  deletedIngredients?: string[];
 };
 
 /**

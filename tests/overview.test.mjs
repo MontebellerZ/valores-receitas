@@ -17,7 +17,7 @@ const summary = {
   sales: { count: 3, packages: 8, revenue: 200, received: 150, pending: 50, pendingCount: 1, cost: 90, profit: 110 },
   producedPackages: 20, availablePackages: 10, productionCost: 160, lostPackages: 2,
   productions: { count: 2, soldPackages: 8, donatedPackages: 2, losses: 7, remainingRevenue: 250, remainingCost: 80,
-    expectedRevenue: 450, referenceRevenue: 400, referenceProfit: 240 },
+    expectedRevenue: 450, referenceRevenue: 400, referenceProfit: 240, discardedPackages: 0, discardedCost: 0 },
 };
 const report = {
   totals: { count: 2, packages: 6, donatedPackages: 2, pendingCount: 1, customers: 2,

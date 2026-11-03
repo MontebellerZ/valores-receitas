@@ -114,13 +114,24 @@
   color: #ffffff;
 }
 
+.status-discarded {
+  color: #d6d8d4;
+}
+
 .status-empty {
   color: #ffd2c9;
 }
 
 .actions {
   display: flex;
+  align-items: center;
   gap: 8px;
+
+  // Iguala o IconButton (31px) à altura do Button small (33px), mantendo o ícone quadrado.
+  > button {
+    height: 33px;
+    min-width: 33px;
+  }
 }
 
 .kpis {

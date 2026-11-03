@@ -16,6 +16,10 @@
   background: #fff;
   box-shadow: 0 24px 70px rgba(20, 34, 23, 0.22);
   animation: modal-enter 0.16s ease-out;
+
+  &.modal-wide {
+    width: min(100%, 980px);
+  }
 }
 
 .modal-header {

@@ -10,6 +10,7 @@ const statuses: Record<ProductionStatus, { label: string; className: string }> =
   waiting: { label: "Aguardando vendas", className: styles["status-waiting"] },
   selling: { label: "Em venda", className: styles["status-selling"] },
   closed: { label: "Encerrada", className: styles["status-closed"] },
+  discarded: { label: "Descartada", className: styles["status-discarded"] },
 };
 
 export default function ProductionHero({ production, report, expiresOn, actions }: {
@@ -31,7 +32,9 @@ export default function ProductionHero({ production, report, expiresOn, actions 
           <h1 id="production-hero-title">{production.recipeName}</h1>
           <div className={styles.tags}>
             <span className={[styles.status, status.className].join(" ")}>{status.label}</span>
-            {expiresOn && <span className={styles.expiry}>Vence em {dateLabel(expiresOn)}</span>}
+            {production.discardedAt
+              ? <span className={styles.expiry}>Descartada em {dateLabel(production.discardedAt)}</span>
+              : expiresOn && <span className={styles.expiry}>Vence em {dateLabel(expiresOn)}</span>}
           </div>
         </div>
       </div>
@@ -46,7 +49,9 @@ export default function ProductionHero({ production, report, expiresOn, actions 
       <div>
         <dt>Pacotes saídos</dt>
         <dd>{number(report.outPackages)} <span>/ {number(production.packages)}</span></dd>
-        <small>{number(report.availablePackages)} disponível(is) para venda</small>
+        <small>{report.discardedPackages > 0
+          ? `${number(report.discardedPackages)} descartado(s) · nenhum disponível`
+          : `${number(report.availablePackages)} disponível(is) para venda`}</small>
       </div>
       <div>
         <dt>Faturamento</dt>

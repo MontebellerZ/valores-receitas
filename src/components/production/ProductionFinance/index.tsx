@@ -38,9 +38,9 @@ export default function ProductionFinance({ production, report }: {
       <div><dt>A receber</dt><dd className={report.pending > 0 ? styles.pending : undefined}>{money(report.pending)}</dd></div>
       <div><dt>Preço médio / pacote vendido</dt><dd>{report.soldPackages > 0 ? money(report.averagePrice) : "—"}</dd></div>
       <div><dt>Margem sobre o faturamento</dt><dd className={negative(report.result)}>{report.revenue > 0 ? `${number(report.margin * 100, 1)}%` : "—"}</dd></div>
-      <div><dt>Custo de doações e perdas</dt><dd>{money(report.giveawayCost)}</dd></div>
+      <div><dt>{report.discardedPackages > 0 ? "Custo de doações, perdas e descarte" : "Custo de doações e perdas"}</dt><dd>{money(report.giveawayCost)}</dd></div>
       <div>
-        <dt title={`Pacotes doados e perdidos multiplicados pelo preço de venda desejado (${money(report.price)})`}>Faturamento perdido</dt>
+        <dt title={`Pacotes doados, perdidos e descartados multiplicados pelo preço de venda desejado (${money(report.price)})`}>Faturamento perdido</dt>
         <dd className={report.missedRevenue > 0 ? styles.negative : undefined}>{money(report.missedRevenue)}</dd>
       </div>
     </dl>

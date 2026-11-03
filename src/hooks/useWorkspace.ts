@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useMatch, useNavigate, useBlocker } from "react-router-dom";
 import { toast } from "react-toastify";
+import { showErrorToast } from "../components/ui/Notifications/toast";
 import type {
   CalculatedProduction,
   Ingredient,
@@ -10,16 +11,17 @@ import type {
   RecipeEdit,
   RecipeListItem,
   Production,
+  ProductionDiscard,
   SaleDraft,
 } from "../domain/models";
 import type { PendingDelete } from "../types/navigation";
 import { paths } from "../app/paths";
 import { makeId } from "../utils/format";
-import { normalize } from "../utils/parsing";
 import {
   prepareSale,
   prepareSales,
   validateProductionUpdate,
+  validateProductionDiscard,
   type ProductionSalesStats,
   type SaleTarget,
 } from "../domain/workspaceRules";
@@ -61,17 +63,54 @@ export function useWorkspace(userId: string) {
       return action(...args);
     };
   const addStock = withConfirmation("Salvar esta entrada no estoque?", data.addStock);
-  const updateStock = withConfirmation("Salvar a correção dos pacotes selecionados?", data.updateStock);
+  const updateStock = withConfirmation(
+    "Salvar a correção dos pacotes selecionados? Correções de quantidade ou preço recalculam o custo dos consumos, das produções e das vendas que usaram estes pacotes.",
+    data.updateStock);
   const adjustStock = withConfirmation("Salvar a baixa deste pacote?", data.adjustStock);
   const deleteStock = data.deleteStock;
   const saveProduction = withConfirmation(
     "Salvar a produção? O estoque será consumido.",
     data.saveProduction,
   );
+  const hasPendingProductionEdit = (id: string) => {
+    if (!(id in data.latestDrafts().productions)) return false;
+    showErrorToast("Esta produção tem alterações não salvas", {
+      description: "Salve ou descarte as alterações pendentes antes de mudar o descarte da produção.",
+    });
+    return true;
+  };
+  /** Returns true when the discard was saved; cancellations and API errors return false. */
+  const discardProduction = async (production: Production, discard: ProductionDiscard, salesCount?: number) => {
+    const error = validateProductionDiscard(production, discard, salesCount);
+    if (error) {
+      showErrorToast("Revise o descarte da produção", { description: error });
+      return false;
+    }
+    if (hasPendingProductionEdit(production.id)) return false;
+    try {
+      await confirmSave("Descartar esta produção? O custo e o consumo de estoque serão mantidos e nenhum pacote ficará disponível para venda.");
+      await data.discardProduction(production.id, { date: discard.date, reason: discard.reason.trim() });
+    } catch {
+      return false;
+    }
+    toast.success("Produção descartada.");
+    return true;
+  };
+  const restoreProduction = async (production: Production) => {
+    if (hasPendingProductionEdit(production.id)) return false;
+    try {
+      await confirmSave("Desfazer o descarte desta produção? Os pacotes não perdidos voltarão a ficar disponíveis para venda.");
+      await data.restoreProduction(production.id);
+    } catch {
+      return false;
+    }
+    toast.success("Descarte desfeito. A produção voltou a aceitar vendas.");
+    return true;
+  };
   const saveChanges = async () => {
     const error = validateRecipeDrafts(Object.values(drafts.recipes).map((edit) => edit.recipe));
     if (error) {
-      toast.error(error);
+      showErrorToast("Revise as alterações da receita", { description: error });
       throw new SaveCancelledError();
     }
     await confirmSave("Salvar as alterações desta tela?");
@@ -95,7 +134,7 @@ export function useWorkspace(userId: string) {
     try {
       const error = validateRecipeDrafts(Object.values(drafts.recipes).map((edit) => edit.recipe));
       if (error) {
-        toast.error(error);
+        showErrorToast("Revise as alterações da receita", { description: error });
         return false;
       }
       await confirmSave(isDirty() ? `${message} As alterações pendentes desta tela também serão salvas.` : message);
@@ -134,7 +173,9 @@ export function useWorkspace(userId: string) {
     changeRecipe(recipe, (edit) => recipeEdits.editRecipe(edit, patch));
   const updateMarket = (item: MarketItem, patch: Partial<MarketItem>) => {
     if (patch.unit !== undefined && item.hasStockHistory) {
-      toast.error("Cadastre outro insumo para usar uma unidade diferente.");
+      showErrorToast("A unidade deste insumo não pode mudar", {
+        description: "Cadastre outro insumo para usar uma unidade diferente.",
+      });
       return;
     }
     const { hasStockHistory, ...current } = withDraft.market(item);
@@ -152,7 +193,7 @@ export function useWorkspace(userId: string) {
     };
     const error = validateRecipeDrafts([recipe]);
     if (error) {
-      toast.error(error);
+      showErrorToast("Revise os dados da receita", { description: error });
       return false;
     }
     const saved = await confirmedCommit("Salvar o cadastro desta receita?", { recipes: [recipe] });
@@ -176,7 +217,7 @@ export function useWorkspace(userId: string) {
     const current = withDraft.production(production);
     const error = validateProductionUpdate(current, patch, stats);
     if (error) {
-      toast.error(error);
+      showErrorToast("Revise os dados da produção", { description: error });
       return;
     }
     stage("productions", { ...current, ...patch });
@@ -227,7 +268,9 @@ export function useWorkspace(userId: string) {
         if (target.kind === "production") {
           const linked = await queryService.sales({ page: 1, pageSize: 10, productionId: target.id });
           if (linked.totalCount > 0) {
-            toast.error("Esta produção possui vendas. Exclua as vendas vinculadas antes de removê-la.");
+            showErrorToast("Esta produção possui vendas vinculadas", {
+              description: "Exclua as vendas vinculadas antes de remover a produção.",
+            });
             setPendingDelete(null);
             return;
           }
@@ -244,7 +287,10 @@ export function useWorkspace(userId: string) {
         if (target.kind === "production" && selectedProductionId === target.id) navigate(paths.productions, { replace: true });
       } else if (target.kind === "market") {
         if (target.hasStockHistory) {
-          toast.error("Um insumo com histórico de estoque não pode ser excluído.");
+          showErrorToast("Este insumo tem histórico de estoque", {
+            description:
+              "Ele não pode ser excluído; mantenha o registro para preservar o histórico.",
+          });
           setPendingDelete(null);
           return;
         }
@@ -266,65 +312,13 @@ export function useWorkspace(userId: string) {
     }
     const deletedLabels = {
       recipe: "Receita excluída.",
-      production: "Produção excluída.",
+      production: "Produção excluída. Os insumos consumidos voltaram ao estoque.",
       sale: "Venda excluída. Os pacotes voltaram ao saldo disponível.",
       market: "Insumo removido. Clique em “Salvar alterações” para gravar.",
       ingredient: "Ingrediente removido. Clique em “Salvar alterações” para gravar.",
     } as const;
     toast.success(deletedLabels[target.kind]);
     setPendingDelete(null);
-  };
-
-  /** Export is an explicit bulk operation: it is the only screen action that reads every record. */
-  const exportWorkbook = async () => {
-    try {
-      const all = await data.loadAll();
-      const { exportWorkbook: exportWorkbookFile } = await import("../services/workbook");
-      await exportWorkbookFile(all);
-      toast.success("Planilha exportada para conta-de-chef.xlsx.");
-    } catch (error) {
-      toast.error(getApiErrorMessage(error, "Não foi possível exportar a planilha."));
-    }
-  };
-
-  /** Import reads the current records in bulk to merge by name and saves only what changed. */
-  const importWorkbook = async (file: File) => {
-    try {
-      const { importWorkbook: importWorkbookFile } = await import("../services/workbook");
-      const imported = await importWorkbookFile(file);
-      const { market, recipes } = await data.loadAll();
-      const idMap = new Map<string, string>();
-      const changedMarket: MarketItem[] = [];
-      for (const item of imported.market) {
-        const existing = market.find((entry) => normalize(entry.name) === normalize(item.name));
-        if (existing) {
-          if (existing.hasStockHistory && existing.unit !== item.unit)
-            throw new Error(`O insumo "${existing.name}" tem estoque e não pode mudar de unidade.`);
-          idMap.set(item.id, existing.id);
-          if (existing.name !== item.name || existing.unit !== item.unit)
-            changedMarket.push({ id: existing.id, name: item.name, unit: item.unit });
-        } else {
-          idMap.set(item.id, item.id);
-          changedMarket.push({ id: item.id, name: item.name, unit: item.unit });
-        }
-      }
-      const changedRecipes = imported.recipes.map((recipe) => {
-        const existing = recipes.find((entry) => normalize(entry.name) === normalize(recipe.name));
-        return {
-          ...recipe, id: existing?.id ?? recipe.id,
-          ingredients: recipe.ingredients.map((ingredient) => ({
-            ...ingredient, marketItemId: idMap.get(ingredient.marketItemId) ?? ingredient.marketItemId,
-          })),
-        };
-      });
-      const saved = await confirmedCommit("Salvar os dados importados da planilha?", {
-        market: changedMarket, recipes: changedRecipes,
-      });
-      if (saved)
-        toast.success(`Planilha importada: ${imported.market.length} insumos e ${imported.recipes.length} receitas.`);
-    } catch (error) {
-      toast.error(getApiErrorMessage(error, "Não foi possível importar a planilha."));
-    }
   };
 
   return {
@@ -340,6 +334,8 @@ export function useWorkspace(userId: string) {
     deleteStock,
     adjustStock,
     saveProduction,
+    discardProduction,
+    restoreProduction,
     canManageStock: data.canManageStock,
     hasUnsavedChanges: data.hasUnsavedChanges,
     saveChanges,
@@ -362,7 +358,5 @@ export function useWorkspace(userId: string) {
     saveSale,
     saveSales,
     confirmDelete,
-    exportWorkbook,
-    importWorkbook,
   };
 }

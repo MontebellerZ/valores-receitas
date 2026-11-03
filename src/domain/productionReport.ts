@@ -1,8 +1,8 @@
 import type { CalculatedProduction, ProductionDayRow, ProductionSalesTotals } from "./models";
-import { remainingPackages } from "./calculations";
+import { isDiscarded, remainingPackages } from "./calculations";
 import { balance } from "./overview";
 
-export type ProductionStatus = "no-packages" | "waiting" | "selling" | "closed";
+export type ProductionStatus = "no-packages" | "waiting" | "selling" | "closed" | "discarded";
 
 const ratio = (part: number, total: number) => (total > 0 ? part / total : 0);
 
@@ -50,6 +50,10 @@ export function buildProductionReport(production: CalculatedProduction, totals: 
   const soldPackages = totals.outPackages - donatedPackages;
   const lostPackages = Math.min(production.lostPackages ?? 0, production.packages);
   const availablePackages = remainingPackages(production, totals.outPackages);
+  const discarded = isDiscarded(production);
+  /** Pacotes que não foram vendidos, doados nem perdidos e saíram do saldo pelo descarte total. */
+  const discardedPackages = discarded
+    ? Math.max(0, production.packages - lostPackages - totals.outPackages) : 0;
   const expectedYield = production.yieldPerBatch * production.quantity;
   const leftoverUnits = Math.max(0, production.produced - production.packages * production.packageQty);
   const price = production.expectedSalePrice ?? production.salePrice;
@@ -59,9 +63,10 @@ export function buildProductionReport(production: CalculatedProduction, totals: 
   const expectedRevenue = production.packages * price;
   const expectedProfit = balance(expectedRevenue, production.cost);
   const status: ProductionStatus =
-    production.packages === 0 ? "no-packages"
-      : availablePackages === 0 ? "closed"
-        : totals.outPackages === 0 ? "waiting" : "selling";
+    discarded ? "discarded"
+      : production.packages === 0 ? "no-packages"
+        : availablePackages === 0 ? "closed"
+          : totals.outPackages === 0 ? "waiting" : "selling";
 
   return {
     salesCount,
@@ -70,11 +75,12 @@ export function buildProductionReport(production: CalculatedProduction, totals: 
     received: totals.received,
     pending: totals.pending,
     soldCost: totals.soldCost,
-    giveawayCost: (donatedPackages + lostPackages) * production.costPerPackage,
-    missedRevenue: (donatedPackages + lostPackages) * price,
+    giveawayCost: (donatedPackages + lostPackages + discardedPackages) * production.costPerPackage,
+    missedRevenue: (donatedPackages + lostPackages + discardedPackages) * price,
     soldPackages,
     donatedPackages,
     lostPackages,
+    discardedPackages,
     availablePackages,
     outPackages: totals.outPackages,
     soldShare: ratio(totals.outPackages, production.packages),

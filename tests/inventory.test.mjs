@@ -2,14 +2,12 @@ import assert from "node:assert/strict";
 import { before, after, test } from "node:test";
 import { fileURLToPath } from "node:url";
 import { createServer } from "vite";
-import XLSX from "xlsx";
 
-let server, calculations, rules, workbookService, paths, workspaceService, api, queryService, toSummary;
+let server, calculations, rules, paths, workspaceService, api, queryService, toSummary;
 before(async () => {
   server = await createServer({ root: fileURLToPath(new URL("../", import.meta.url)), server: { middlewareMode: true, hmr: false }, logLevel: "silent" });
   calculations = await server.ssrLoadModule("/src/domain/calculations.ts");
   rules = await server.ssrLoadModule("/src/domain/workspaceRules.ts");
-  workbookService = await server.ssrLoadModule("/src/services/workbook.ts");
   ({ paths } = await server.ssrLoadModule("/src/app/paths.ts"));
   ({ workspaceService } = await server.ssrLoadModule("/src/services/workspace.ts"));
   ({ api } = await server.ssrLoadModule("/src/services/http.ts"));
@@ -65,35 +63,26 @@ const withAdapter = async (respond, run) => {
   }
 };
 
-test("explicit bulk snapshots normalize nullable sale prices and retain authoritative production totals", async () => {
-  await withAdapter(() => ({
-    data: { market: [], recipes: [], sales: [], revision: 4, productions: [{ ...production, expectedSalePrice: null }] },
-  }), async (requests) => {
-    const loaded = await workspaceService.load();
-    assert.equal(loaded.productions[0].expectedSalePrice, undefined);
-    assert.equal(loaded.productions[0].totalCost, 1);
-    const saved = await workspaceService.save(loaded);
-    assert.equal(saved.revision, 4);
-    assert.equal(JSON.parse(requests[1].data).revision, 4);
-  });
-});
-
-test("incremental saves PATCH only changed records and deleted ids and require the new revision", async () => {
-  const changes = {
-    market: [], recipes: [], productions: [{ ...production }], sales: [],
-    deleted: { market: ["old"], recipes: [], productions: [], sales: ["sale"] }, revision: 7,
-  };
-  await withAdapter(() => ({ data: { productions: [{ ...production, expectedSalePrice: null }], revision: 8 } }), async (requests) => {
-    const saved = await workspaceService.patch(changes);
-    assert.equal(requests[0].method, "patch");
-    assert.equal(requests[0].url, "/data");
-    assert.deepEqual(JSON.parse(requests[0].data), changes);
-    assert.equal(saved.revision, 8);
-    assert.deepEqual([saved.market, saved.recipes, saved.sales], [[], [], []]);
-    assert.equal(saved.productions[0].expectedSalePrice, undefined);
+test("resource saves PATCH their own endpoints with only their changes and revision", async () => {
+  const changes = [
+    ["/market", workspaceService.patchMarket, { changed: [], deleted: ["market"], revision: 7 }],
+    ["/recipes", workspaceService.patchRecipes, {
+      changed: [], deleted: ["recipe"], revision: 8,
+      partialRecipeIngredients: true, deletedIngredients: ["ingredient"],
+    }],
+    ["/productions", workspaceService.patchProductions, { changed: [production], deleted: [], revision: 9 }],
+    ["/sales", workspaceService.patchSales, { changed: [], deleted: ["sale"], revision: 10 }],
+  ];
+  await withAdapter((_config, index) => ({ data: { revision: index + 7 } }), async (requests) => {
+    for (const [path, save, body] of changes) {
+      const saved = await save(body);
+      assert.equal(saved.revision, body.revision + 1);
+    }
+    assert.deepEqual(requests.map(({ method, url, data }) => ({ method, url, body: JSON.parse(data) })),
+      changes.map(([path, , body]) => ({ method: "patch", url: path, body })));
   });
   await withAdapter(() => ({ data: {} }), async () => {
-    await assert.rejects(workspaceService.patch(changes), /revisão/);
+    await assert.rejects(workspaceService.patchSales({ changed: [], deleted: [], revision: 1 }), /revisão/);
   });
 });
 
@@ -101,7 +90,7 @@ test("paged queries validate page sizes and the page envelope without silent fal
   await withAdapter(() => ({ data: { items: [{ id: "a", name: "A", unit: "g", ingredientCount: 3 }], page: 2, pageSize: 25, totalCount: 26, totalPages: 2 } }),
     async (requests) => {
       const page = await queryService.market({ page: 2, pageSize: 25, search: "  ", sortBy: "name", descending: false });
-      assert.equal(requests[0].url, "/query/market");
+      assert.equal(requests[0].url, "/market");
       assert.deepEqual(requests[0].params, { page: 2, pageSize: 25, sortBy: "name", descending: false });
       assert.equal(page.items[0].ingredientCount, 3);
       assert.equal(page.totalCount, 26);
@@ -145,7 +134,7 @@ test("balances and summaries require the server aggregates", async () => {
     periodSales: { count: 1, packages: 4, revenue: 8, cost: 1 } };
   await withAdapter(() => ({ data: { items: [balance], page: 1, pageSize: 10, totalCount: 1, totalPages: 1 } }), async (requests) => {
     const page = await queryService.balances({ page: 1, pageSize: 10, available: true });
-    assert.equal(requests[0].url, "/query/balances");
+    assert.equal(requests[0].url, "/productions/balances");
     assert.equal(requests[0].params.available, true);
     assert.deepEqual([page.items[0].id, page.items[0].soldPackages, page.items[0].availablePackages], [production.id, 4, 26]);
     assert.equal(page.items[0].donatedPackages, 1);
@@ -163,7 +152,7 @@ test("production reports and sales require the server accumulated revenue", asyn
   const page = (items) => ({ items, page: 2, pageSize: 10, totalCount: 11, totalPages: 2 });
   await withAdapter(() => ({ data: { ...totals, daily: page([day]) } }), async (requests) => {
     const report = await queryService.report("bread", { page: 2, pageSize: 10 });
-    assert.equal(requests[0].url, "/query/productions/bread/report");
+    assert.equal(requests[0].url, "/productions/bread/report");
     assert.deepEqual(report.daily.items, [{ ...day, date: "2026-10-20" }]);
     assert.deepEqual(report.topBuyers, totals.topBuyers);
   });
@@ -183,28 +172,13 @@ test("production reports and sales require the server accumulated revenue", asyn
   const sale = { id: "sale", productionId: "bread", date: "2026-10-20", packages: 2, pricePerPackage: 3, cumulativeRevenue: 16 };
   await withAdapter(() => ({ data: page([sale]) }), async (requests) => {
     const sales = await queryService.productionSales("bread", { page: 2, pageSize: 10, sortBy: "total", descending: true });
-    assert.equal(requests[0].url, "/query/sales");
+    assert.equal(requests[0].url, "/sales");
     assert.deepEqual(requests[0].params, { page: 2, pageSize: 10, sortBy: "total", descending: true, productionId: "bread" });
     assert.equal(sales.items[0].cumulativeRevenue, 16);
   });
   await withAdapter(() => ({ data: page([{ ...sale, cumulativeRevenue: null }]) }), async () => {
     await assert.rejects(queryService.productionSales("bread", { page: 1, pageSize: 10 }), /Resposta inesperada/);
   });
-});
-
-test("input workbook imports name and unit without purchase data and links recipe ingredients", async () => {
-  const workbook = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet([{ Item: "Farinha", Unidade: "g", "Qtd pacote": 1000 }]), "Insumos");
-  XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet([{ Receita: "Pão", Rendimento: 10, Item: "Farinha", "Quantidade usada": 500 }]), "Receitas");
-  const buffer = XLSX.write(workbook, { type: "buffer", bookType: "xlsx" });
-  const result = await workbookService.importWorkbook({ arrayBuffer: async () => buffer });
-  assert.equal(result.market.length, 1);
-  assert.equal(result.market[0].name, "Farinha");
-  assert.equal(result.market[0].unit, "g");
-  assert.equal("packageQty" in result.market[0], false);
-  assert.equal("packagePrice" in result.market[0], false);
-  assert.equal(result.recipes[0].ingredients[0].marketItemId, result.market[0].id);
-  assert.equal(result.recipes[0].ingredients[0].quantity, 500);
 });
 
 test("stock entry requests include each purchase's package quantity and price in compact mode", async () => {
@@ -230,20 +204,11 @@ test("stock entry requests include each purchase's package quantity and price in
   }
 });
 
-test("name-and-unit-only workbooks import without a package size", async () => {
-  const workbook = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet([{ Item: "Manteiga BH", Unidade: "g" }]), "Insumos");
-  const buffer = XLSX.write(workbook, { type: "buffer", bookType: "xlsx" });
-  const result = await workbookService.importWorkbook({ arrayBuffer: async () => buffer });
-  assert.deepEqual(Object.keys(result.market[0]).sort(), ["id", "name", "unit"]);
-  assert.equal(result.market[0].name, "Manteiga BH");
-});
-
 test("stock pages include exhausted packages and corrections send only opted-in fields with revision", async () => {
   await withAdapter(() => ({ data: { items: [], page: 1, pageSize: 10, totalCount: 0, totalPages: 0 } }), async (requests) => {
     const controller = new AbortController();
     await queryService.stock({ page: 1, pageSize: 10, includeInactive: true, sortBy: "entryOrder", descending: true }, controller.signal);
-    assert.equal(requests[0].url, "/query/stock");
+    assert.equal(requests[0].url, "/stock");
     assert.equal(requests[0].params.includeInactive, true);
     assert.equal(requests[0].signal, controller.signal);
     await workspaceService.updateStock({ lotIds: ["one", "two"], packagePrice: 0, reason: "Preço incorreto" }, 8);
@@ -268,6 +233,23 @@ test("stock deletion encodes the package id, sends the current revision and retu
   });
 });
 
+test("production discard and undo encode the id, send the current revision and return the server revision", async () => {
+  await withAdapter(() => ({ data: { revision: 12 } }), async (requests) => {
+    const discard = { date: "2026-10-20", reason: "Lote contaminado" };
+    assert.deepEqual(await workspaceService.discardProduction("prod /?#", discard, 11), { revision: 12 });
+    assert.equal(requests[0].method, "post");
+    assert.equal(requests[0].url, "/productions/prod%20%2F%3F%23/discard");
+    assert.deepEqual(JSON.parse(requests[0].data), { ...discard, revision: 11 });
+    assert.deepEqual(await workspaceService.restoreProduction("prod", 12), { revision: 12 });
+    assert.equal(requests[1].method, "delete");
+    assert.equal(requests[1].url, "/productions/prod/discard");
+    assert.deepEqual(requests[1].params, { revision: 12 });
+  });
+  await withAdapter(() => ({ data: undefined, status: 204 }), async () => {
+    await assert.rejects(workspaceService.restoreProduction("prod", 12), /revisão/);
+  });
+});
+
 test("recipe edits across ingredient pages coalesce into one partial recipe patch", async () => {
   const edits = await server.ssrLoadModule("/src/domain/recipeEdits.ts");
   const saved = { id: "r1", name: "Pão", category: "", yield: 10, hoursPerBatch: 1, ingredients: [], ingredientCount: 32 };
@@ -287,16 +269,16 @@ test("recipe edits across ingredient pages coalesce into one partial recipe patc
   change((edit) => edits.removeIngredient(edit, "i2"));
   assert.deepEqual(Object.keys(drafts), ["r1"]);
   const body = edits.recipePatch(Object.values(drafts));
-  assert.equal(body.recipes.length, 1);
-  assert.equal(body.recipes[0].name, "Pão integral");
-  assert.equal("ingredientCount" in body.recipes[0], false);
-  assert.deepEqual(body.recipes[0].ingredients, [{ id: "i11", marketItemId: "m11", quantity: 21 }, { id: "i1", marketItemId: "m1", quantity: 8 }]);
+  assert.equal(body.changed.length, 1);
+  assert.equal(body.changed[0].name, "Pão integral");
+  assert.equal("ingredientCount" in body.changed[0], false);
+  assert.deepEqual(body.changed[0].ingredients, [{ id: "i11", marketItemId: "m11", quantity: 21 }, { id: "i1", marketItemId: "m1", quantity: 8 }]);
   assert.equal(body.partialRecipeIngredients, true);
   assert.deepEqual(body.deletedIngredients, ["i2"]);
   assert.deepEqual(edits.editedIngredients(drafts, "r1", page1), [{ id: "i1", marketItemId: "m1", quantity: 8 }]);
   assert.equal(edits.editedRecipe(drafts, saved).ingredientCount, 31);
   // Whole recipes (registration, import) keep full replacement and never send the partial fields.
-  assert.deepEqual(edits.recipePatch([], [saved]), { recipes: [saved] });
+  assert.deepEqual(edits.recipePatch([], [saved]), { changed: [saved] });
   assert.throws(() => edits.recipePatch(Object.values(drafts), [saved]), /Salve ou descarte/);
   assert.throws(() => edits.recipePatch([drafts.r1, drafts.r1]), /duplicidade/);
 });
@@ -307,9 +289,9 @@ test("recipe metadata requires the ingredient count and ingredients are paged on
     : { items: [{ id: "i1", marketItemId: "m1", quantity: 1 }], page: 2, pageSize: 10, totalCount: 32, totalPages: 4 } }),
   async (requests) => {
     assert.equal((await queryService.recipeMetadata("r1")).ingredientCount, 32);
-    assert.equal(requests[0].url, "/query/recipes/r1/metadata");
+    assert.equal(requests[0].url, "/recipes/r1/metadata");
     const page = await queryService.recipeIngredients("r1", { page: 2, pageSize: 10, sortBy: "quantity", descending: true, search: "fa" });
-    assert.equal(requests[1].url, "/query/recipes/r1/ingredients");
+    assert.equal(requests[1].url, "/recipes/r1/ingredients");
     assert.deepEqual(requests[1].params, { page: 2, pageSize: 10, sortBy: "quantity", descending: true, search: "fa" });
     assert.equal(page.totalCount, 32);
   });

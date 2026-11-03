@@ -1,8 +1,14 @@
 .container {
+  width: min(440px, calc(100vw - 32px));
+
   :global(.Toastify__toast) {
+    min-height: unset;
+    padding: 14px 16px;
     border-radius: 7px;
     font-family: "DM Sans", sans-serif;
-    font-size: 12px;
+    font-size: 13px;
+    line-height: 1.5;
+    box-shadow: 0 8px 24px rgb(34 45 37 / 12%);
   }
   :global(.Toastify__toast--success) {
     border-left: 4px solid #436958;

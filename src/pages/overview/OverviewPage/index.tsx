@@ -13,7 +13,6 @@ import PackageDestinationBar from "../../../components/ui/PackageDestinationBar"
 import { money, number as count, dateLabel } from "../../../utils/format";
 import { balance, type Period } from "../../../domain/overview";
 import { ArrowRight, Eye, ShoppingBag, ChartNoAxesCombined, Wallet, Package, CircleAlert, TrendingUp } from "lucide-react";
-import type { ReactNode } from "react";
 import type { ProductionBalance, Sale, SalesReport, WorkspaceSummary } from "../../../domain/models";
 import type { Resource } from "../../../hooks/useResource";
 import type { ListControls } from "../../../hooks/usePagedQuery";
@@ -36,7 +35,6 @@ type Props = {
   recentSales: ListControls & { items: Sale[] };
   recipeCount: number;
   marketCount: number;
-  importAction: ReactNode;
   onViewSales: () => void;
   onViewProduction: (id?: string) => void;
 };
@@ -47,7 +45,7 @@ const emptySummary: WorkspaceSummary = {
   sales: { count: 0, packages: 0, revenue: 0, received: 0, pending: 0, pendingCount: 0, cost: 0, profit: 0 },
   availablePackages: 0, productionCost: 0, producedPackages: 0, lostPackages: 0,
   productions: { count: 0, soldPackages: 0, donatedPackages: 0, losses: 0, remainingRevenue: 0, remainingCost: 0,
-    expectedRevenue: 0, referenceRevenue: 0, referenceProfit: 0 },
+    expectedRevenue: 0, referenceRevenue: 0, referenceProfit: 0, discardedPackages: 0, discardedCost: 0 },
 };
 
 export default function Overview({
@@ -62,7 +60,6 @@ export default function Overview({
   recentSales: recent,
   recipeCount,
   marketCount,
-  importAction,
   onViewSales,
   onViewProduction,
 }: Props) {
@@ -88,7 +85,7 @@ export default function Overview({
   };
   const allocatedPercent =
     planning.packages > 0
-      ? Math.min(100, ((planning.soldPackages + summary.lostPackages) / planning.packages) * 100)
+      ? Math.min(100, ((planning.soldPackages + summary.lostPackages + planning.discardedPackages) / planning.packages) * 100)
       : 0;
 
   return (
@@ -100,7 +97,6 @@ export default function Overview({
         description="Resultados, oportunidades e próximos passos para cuidar do seu negócio."
         action={
           <div className={styles["welcome-actions"]}>
-            {importAction}
             <Button onClick={onViewSales}>
               <ShoppingBag size={17} aria-hidden="true" /> Vendas
             </Button>
@@ -193,7 +189,8 @@ export default function Overview({
         <dl><div><dt>Pacotes produzidos</dt><dd>{count(planning.packages)}</dd></div>
           <div><dt>Disponíveis agora</dt><dd>{count(planning.available)}</dd></div>
           <div><dt>Custo de produção</dt><dd>{money(planning.cost)}</dd></div>
-          <div><dt>Pacotes perdidos</dt><dd>{count(summary.lostPackages)}</dd></div></dl>
+          <div><dt>Pacotes perdidos</dt><dd>{count(summary.lostPackages)}</dd></div>
+          <div><dt>Pacotes descartados</dt><dd>{count(planning.discardedPackages)}<small>Custo descartado: {money(planning.discardedCost)}</small></dd></div></dl>
       </section>
 
       <div className={styles["overview-summary-grid"]}>
@@ -206,11 +203,14 @@ export default function Overview({
           {progress.status === "error" ? <EmptyState>Não foi possível carregar as produções do período.</EmptyState> : progress.items.length ? (
             <div className={styles["overview-production-progress"]} aria-busy={progress.status === "loading"}>
               {progress.items.map(describe).map((production) => {
+                const discarded = production.discardedAt
+                  ? Math.max(0, production.packages - production.soldPackages - (production.lostPackages ?? 0))
+                  : 0;
                 const percent =
                   production.packages > 0
                     ? Math.min(
                       100,
-                      ((production.soldPackages + (production.lostPackages ?? 0)) / production.packages) *
+                      ((production.soldPackages + (production.lostPackages ?? 0) + discarded) / production.packages) *
                       100,
                     )
                     : 0;
@@ -218,7 +218,7 @@ export default function Overview({
                   <div key={production.id}>
                     <div className={styles["overview-progress-heading"]}>
                       <div>
-                        <strong>{production.recipeName}</strong>
+                        <strong>{production.recipeName}{production.discardedAt ? " (descartada)" : ""}</strong>
                         <small>{dateLabel(production.date)}</small>
                       </div>
                       <span>
@@ -232,6 +232,7 @@ export default function Overview({
                       donated={production.donatedPackages}
                       lost={production.lostPackages ?? 0}
                       available={production.available}
+                      discarded={discarded}
                     />
                     <div className={styles["overview-progress-footer"]}>
                       <Button variant="inline" onClick={() => onViewProduction(production.id)}>Ver produção <ArrowRight size={13} aria-hidden="true" /></Button>
@@ -277,7 +278,7 @@ export default function Overview({
           </dl>
           <div className={styles["overview-stock-progress"]}>
             <span>
-              {count(allocatedPercent, 1)}% dos pacotes com destino definido: vendidos, doados ou perdidos
+              {count(allocatedPercent, 1)}% dos pacotes com destino definido: vendidos, doados, perdidos ou descartados
             </span>
             <PackageDestinationBar
               label="Destino dos pacotes das produções do período"
@@ -286,6 +287,7 @@ export default function Overview({
               donated={planning.donatedPackages}
               lost={summary.lostPackages}
               available={planning.available}
+              discarded={planning.discardedPackages}
             />
           </div>
           <details className={styles["overview-reference"]}>
@@ -328,14 +330,16 @@ export default function Overview({
                 </tr>
               </thead><tbody>
                 {productions.items.map(describe).map((production) => {
-                  const source = production.hasSales
-                    ? "Realizado"
-                    : production.expectedSalePrice !== undefined
-                      ? "Esperado"
-                      : "Previsto";
+                  const source = production.discardedAt
+                    ? "Descartada"
+                    : production.hasSales
+                      ? "Realizado"
+                      : production.expectedSalePrice !== undefined
+                        ? "Esperado"
+                        : "Previsto";
                   const revenue = production.hasSales
                     ? production.realized.revenue
-                    : production.price * production.packages;
+                    : production.discardedAt ? 0 : production.price * production.packages;
                   const cost = production.hasSales
                     ? production.realized.cost
                     : production.cost;
@@ -343,7 +347,7 @@ export default function Overview({
                   return (
                     <tr key={production.id}>
                       <td>
-                        <strong>{production.recipeName}</strong>
+                        <strong>{production.recipeName}{production.discardedAt ? " (descartada)" : ""}</strong>
                         <small>{dateLabel(production.date)}</small>
                       </td>
                       <td>{count(production.realized.packages)}</td>

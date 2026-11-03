@@ -16,7 +16,7 @@ import SearchField from "../../../components/ui/SearchField";
 import type { ListControls } from "../../../hooks/usePagedQuery";
 import styles from "./styles.module.scss";
 import { remainingPackages } from "../../../domain/calculations";
-import { localToday, money, number } from "../../../utils/format";
+import { dateLabel, localToday, money, number } from "../../../utils/format";
 import { toast } from "react-toastify";
 
 type Props = Omit<ListControls, "serverSort"> & {
@@ -139,13 +139,14 @@ export default function ProductionsPage({
                 : production.profit;
               return (
                 <SummaryItem key={production.id} name={production.recipeName}
-                  title={<>{production.recipeName}{production.quantity === 0 ? " (rascunho)" : ""}{production.isStandalone ? " (avulsa)" : ""}</>}
+                  title={<>{production.recipeName}{production.quantity === 0 ? " (rascunho)" : ""}{production.isStandalone ? " (avulsa)" : ""}{production.discardedAt ? " (descartada)" : ""}</>}
                   description={<>{production.date
                           ? new Intl.DateTimeFormat("pt-BR").format(
                               new Date(`${production.date}T12:00:00`),
                             )
                           : "Data não informada"}{" "}
                         · {number(production.quantity, 4)} lotes
+                        {production.discardedAt && <> · Descartada em {dateLabel(production.discardedAt)}</>}
                   </>}
                   metrics={[
                     { label: "Pacotes", value: number(production.packages) },

@@ -8,14 +8,17 @@ type Props = {
   donated: number;
   lost: number;
   available: number;
+  /** Packages removed from the balance by a total production discard; shown only when positive. */
+  discarded?: number;
 };
 
-export default function PackageDestinationBar({ label, total, sold, donated, lost, available }: Props) {
+export default function PackageDestinationBar({ label, total, sold, donated, lost, available, discarded = 0 }: Props) {
   const segments = [
     { label: "Vendidos", value: sold, className: styles.sold },
     { label: "Doados", value: donated, className: styles.donated },
     { label: "Perdidos", value: lost, className: styles.lost },
     { label: "Disponíveis", value: available, className: styles.available },
+    ...(discarded > 0 ? [{ label: "Descartados", value: discarded, className: styles.discarded }] : []),
   ];
   const description = segments.map((segment) => `${segment.label}: ${number(segment.value)}`).join(", ");
   return <div>

@@ -10,16 +10,17 @@ type Props = {
   children: ReactNode;
   busy?: boolean;
   className?: string;
+  size?: "default" | "wide";
 };
 
-export default function RegistrationModal({ title, onClose, children, busy = false, className }: Props) {
+export default function RegistrationModal({ title, onClose, children, busy = false, className, size = "default" }: Props) {
   return (
     <Dialog
         onClose={onClose}
         dismissDisabled={busy}
         aria-busy={busy}
         overlayClassName={styles["modal-overlay"]}
-        className={[styles["modal-dialog"], className].filter(Boolean).join(" ")}
+        className={[styles["modal-dialog"], size === "wide" ? styles["modal-wide"] : "", className].filter(Boolean).join(" ")}
         aria-label={title}
       >
         <header className={styles["modal-header"]}>

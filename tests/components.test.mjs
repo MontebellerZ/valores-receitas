@@ -371,6 +371,7 @@ test("shared UI patterns are reused across consumers instead of copied into page
 
 test("sales registration renders one editor and a selectable cart sidebar while edits remain individual", async () => {
   const { default: SaleForm } = await load(path.join("components", "sales", "SaleForm", "index.tsx"));
+  const { default: modalStyles } = await load(path.join("components", "ui", "RegistrationModal", "styles.module.scss"));
   const balance = { id: "p1", recipeId: "r1", recipeName: "Bolo", date: "2026-10-20", quantity: 1, packages: 5, salePrice: 10,
     soldPackages: 0, availablePackages: 5, lostPackages: 0, periodSales: { count: 0, packages: 0, revenue: 0, cost: 0 } };
   const props = {
@@ -390,6 +391,9 @@ test("sales registration renders one editor and a selectable cart sidebar while 
   assert.equal((cart.match(/type="number"/g) ?? []).length, 1);
   assert.equal((cart.match(/role="combobox"/g) ?? []).length, 1);
   assert.doesNotMatch(cart, /Remover venda 1/);
+  const cartModal = render(SaleForm, { ...props, isModal: true });
+  assert.ok(cartModal.includes(modalStyles["modal-wide"]));
+  assert.match(cartModal, /role="dialog" aria-modal="true"/);
   const sale = { id: "s1", productionId: "p1", productionDate: "2026-10-20",
     recipeName: "Bolo", date: "2026-10-22", packages: 5, pricePerPackage: 8,
     costPerPackage: 2, customer: "Ana", paid: false, notes: "Entrega" };
@@ -400,9 +404,22 @@ test("sales registration renders one editor and a selectable cart sidebar while 
   assert.match(edit, /value="2026-10-22"/);
   assert.match(edit, /max="5"/);
   assert.doesNotMatch(edit, /Adicionar outra venda|Confirmar vendas|Total do carrinho|<aside/);
+  const editModal = render(SaleForm, { ...props, sale, isModal: true });
+  assert.ok(editModal.includes(modalStyles["modal-dialog"]));
+  assert.ok(!editModal.includes(modalStyles["modal-wide"]));
   const empty = render(SaleForm, { ...props, initialBalance: null, totalAvailable: 0 });
   assert.match(empty, /Não há mais pacotes disponíveis/);
   assert.match(empty, /<button[^>]*disabled=""[^>]*>[\s\S]*?Adicionar outra venda/);
+});
+
+test("wide registration modal sizing overrides the default without depending on stylesheet order", () => {
+  const css = postcss.parse(sass.compile(path.join(src, "components", "ui", "RegistrationModal", "styles.module.scss")).css);
+  const widths = new Map();
+  css.walkRules((rule) => {
+    rule.walkDecls("width", (declaration) => widths.set(rule.selector, declaration.value));
+  });
+  assert.equal(widths.get(".modal-dialog"), "min(100%, 620px)");
+  assert.equal(widths.get(".modal-dialog.modal-wide"), "min(100%, 980px)");
 });
 
 test("market and recipe inputs share the same control styles and preserve stock locks", async () => {
@@ -477,7 +494,7 @@ test("layout retains active navigation and each synchronization state", async ()
   const props = {
     session: { id: "test", email: "test@example.test" },
     recipeCount: 1, productionCount: 2, salesCount: 3, marketCount: 4,
-    signOut() { }, exportWorkbook() { },
+    signOut() { },
   };
   for (const apiStatus of ["error", "saving", "connecting", "connected"]) {
     const html = renderToStaticMarkup(createElement(

@@ -1,6 +1,6 @@
 /**
  * Table column index → API `sortBy` field for every server-sorted listing.
- * Only fields accepted by the `/api/query` endpoints are listed; other columns are not sortable.
+ * Only fields accepted by the resource endpoints are listed; other columns are not sortable.
  */
 export const realizedSalesSortColumns = { 0: "date", 1: "customer", 2: "packages", 3: "pricePerPackage", 4: "total", 6: "paid" };
 export const marketSortColumns = { 0: "name", 1: "unit" };

@@ -179,7 +179,7 @@ export default function Sales({
                 {balances.items.map((production) => (
                   <tr key={production.id}>
                     <td>
-                      <strong>{production.recipeName}</strong>
+                      <strong>{production.recipeName}{production.discardedAt ? " (descartada)" : ""}</strong>
                       <small>{dateLabel(production.date)}</small>
                     </td>
                     <td>{count(production.packages)}</td>

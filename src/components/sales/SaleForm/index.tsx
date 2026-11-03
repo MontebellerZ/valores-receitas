@@ -14,6 +14,7 @@ import type { ProductionBalance, Sale, SaleDraft } from "../../../domain/models"
 import { remainingPackages } from "../../../domain/calculations";
 import { queryService } from "../../../services/query";
 import RegistrationModal from "../../ui/RegistrationModal";
+import { showErrorToast } from "../../ui/Notifications/toast";
 import {
   money,
   number as count,
@@ -132,13 +133,18 @@ export default function SaleForm({
         !Number.isFinite(new Date(`${entry.date}T12:00:00`).getTime()) ||
         !valid || entry.date < selected.date) {
         setActiveKey(entry.key);
-        toast.error(`Venda ${index + 1}: selecione uma produção, uma data igual ou posterior à produção, uma quantidade inteira positiva e um preço válido.`);
+        showErrorToast(`Confira os dados da venda ${index + 1}`, {
+          description:
+            "Selecione uma produção, informe uma data igual ou posterior à produção, uma quantidade inteira positiva e um preço válido.",
+        });
         return;
       }
       const available = availablePackages(selected, entry.key);
       if (quantity > available) {
         setActiveKey(entry.key);
-        toast.error(`Venda ${index + 1}: esta produção tem apenas ${count(available)} pacotes disponíveis, considerando as outras vendas do carrinho.`);
+        showErrorToast("Estoque insuficiente para esta venda", {
+          description: `A produção tem ${count(available)} pacotes disponíveis, considerando as outras vendas do carrinho. Reduza a quantidade ou escolha outra produção.`,
+        });
         return;
       }
       drafts.push({
@@ -159,7 +165,9 @@ export default function SaleForm({
       // null means the workspace already handled cancellation or failure.
       if (message === null) return;
       if (message) {
-        toast.error(message);
+        showErrorToast("Não foi possível salvar a venda", {
+          description: message,
+        });
       } else {
         toast.success(sale ? "Venda atualizada." : drafts.length === 1 ? "Venda registrada." : `${drafts.length} vendas registradas.`);
         onCancel();
@@ -366,7 +374,7 @@ export default function SaleForm({
   return isModal ? (
     <RegistrationModal
       title={sale ? "Editar venda" : "Cadastrar vendas"}
-      className={!sale ? styles["sales-cart-modal"] : undefined}
+      size={sale ? "default" : "wide"}
       busy={isSaving}
       onClose={() => { if (!isSaving) onCancel(); }}
     >

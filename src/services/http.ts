@@ -29,3 +29,13 @@ export function getApiErrorMessage(error: unknown, fallback: string) {
 
   return error instanceof Error ? error.message : fallback;
 }
+
+export function isDuplicateAccountError(error: unknown) {
+  if (!axios.isAxiosError<ApiProblem>(error)) {
+    return false;
+  }
+
+  return Object.keys(error.response?.data?.errors ?? {}).some((code) =>
+    ["DuplicateEmail", "DuplicateUserName"].includes(code),
+  );
+}

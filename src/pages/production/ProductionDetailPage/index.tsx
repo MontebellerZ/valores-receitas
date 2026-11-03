@@ -11,12 +11,13 @@ import BackButton from "../../../components/ui/BackButton";
 import { toast } from "react-toastify";
 import Icon from "../../../components/ui/Icon";
 import PageHeader from "../../../components/ui/PageHeader";
-import type { Production, ProductionReportPage, ProductionSale, StockConsumption } from "../../../domain/models";
+import type { Production, ProductionDiscard, ProductionReportPage, ProductionSale, StockConsumption } from "../../../domain/models";
 import type { ListControls, QueryStatus } from "../../../hooks/usePagedQuery";
 import type { ProductionSalesStats } from "../../../domain/workspaceRules";
 import type { PendingDelete } from "../../../types/navigation";
-import { calculateProduction } from "../../../domain/calculations";
-import { money, number } from "../../../utils/format";
+import { calculateProduction, isDiscarded } from "../../../domain/calculations";
+import { dateLabel, money, number } from "../../../utils/format";
+import DiscardProductionModal from "../../../components/production/DiscardProductionModal";
 import SalePriceSimulation from "../../../components/production/SalePriceSimulation";
 import RealizedSales from "../../../components/production/RealizedSales";
 import ProductionHero from "../../../components/production/ProductionHero";
@@ -39,19 +40,29 @@ type Props = {
   consumptions: ListControls & { items: StockConsumption[] };
   updateProduction: (patch: Partial<Production>, stats: ProductionSalesStats) => void;
   saveProduction: (production: Production) => Promise<void>;
+  /** Saves a total discard; resolves true when it was confirmed and saved. */
+  discardProduction: (production: Production, discard: ProductionDiscard, salesCount?: number) => Promise<boolean>;
+  /** Undoes the discard; resolves true when it was confirmed and saved. */
+  restoreProduction: (production: Production) => Promise<boolean>;
   onRequestDelete: (target: PendingDelete) => void;
   onBack: () => void;
   onViewSales: () => void;
 };
 
-export default function ProductionDetailPage({ production, shelfLifeDays, report: reportPage, sales, consumptions, updateProduction, saveProduction, onRequestDelete, onBack, onViewSales }: Props) {
+export default function ProductionDetailPage({ production, shelfLifeDays, report: reportPage, sales, consumptions, updateProduction, saveProduction, discardProduction, restoreProduction, onRequestDelete, onBack, onViewSales }: Props) {
   const [draft, setDraft] = useState<Production>(() => ({ ...production, quantity: production.quantity || 1 }));
   const [busy, setBusy] = useState(false);
+  const [isDiscarding, setIsDiscarding] = useState(false);
   const saved = production.quantity > 0;
+  const discarded = isDiscarded(production);
   const current = saved ? production : draft;
   const result = calculateProduction(current);
   const standalone = Boolean(current.isStandalone);
   const update = (patch: Partial<Production>) => {
+    if (saved && discarded) {
+      toast.error("Produções descartadas não podem ser alteradas. Desfaça o descarte para editá-la.");
+      return;
+    }
     if (saved && "totalCost" in patch && (patch.totalCost == null || patch.totalCost < 0)) return;
     if (saved) {
       if (!reportPage.data) {
@@ -63,10 +74,12 @@ export default function ProductionDetailPage({ production, shelfLifeDays, report
     } else setDraft((entry) => ({ ...entry, ...patch }));
   };
 
-  const deleteButton = <IconButton danger aria-label="Excluir produção" onClick={() => onRequestDelete({
+  const deleteButton = <IconButton danger aria-label="Excluir produção" disabled={saved && discarded}
+    title={saved && discarded ? "Produções descartadas não podem ser excluídas. Desfaça o descarte antes de removê-la." : undefined}
+    onClick={() => onRequestDelete({
     kind: "production", id: production.id, label: `${production.recipeName} — ${production.date}`,
   })}><Icon name="trash" size={17} /></IconButton>;
-  const fields = <ProductionFields value={current} locked={saved} disabled={busy} onChange={update} />;
+  const fields = <ProductionFields value={current} locked={saved} disabled={busy || discarded} onChange={update} />;
 
   if (!saved) return <>
     <BackButton onClick={onBack}>Voltar para produção</BackButton>
@@ -96,11 +109,29 @@ export default function ProductionDetailPage({ production, shelfLifeDays, report
   const report = buildProductionReport(result, reportPage.data);
   const daily = reportPage.data.daily;
   const days = fillDailyGaps(daily.items);
+  const salesCount = reportPage.data.salesCount;
+  const runAction = (action: () => Promise<boolean>, onDone?: () => void) => {
+    setBusy(true);
+    void action().then((done) => { if (done) onDone?.(); }).finally(() => setBusy(false));
+  };
+  const heroActions = <>
+    {discarded
+      ? <Button variant="secondary" size="small" disabled={busy}
+        onClick={() => runAction(() => restoreProduction(production))}>Desfazer descarte</Button>
+      : <Button variant="secondary" size="small" disabled={busy || salesCount > 0}
+        title={salesCount > 0 ? "Produções com vendas não podem ser descartadas. Informe os pacotes perdidos." : undefined}
+        onClick={() => setIsDiscarding(true)}>Descartar produção</Button>}
+    {deleteButton}
+  </>;
   return <>
     <BackButton onClick={onBack}>Voltar para produção</BackButton>
-    <ProductionHero production={result} report={report} expiresOn={expirationDate(production.date, shelfLifeDays)} actions={deleteButton} />
+    <ProductionHero production={result} report={report} expiresOn={expirationDate(production.date, shelfLifeDays)} actions={heroActions} />
+    {discarded && <Panel className={styles.section} title="Produção descartada"
+      description={`Descartada em ${dateLabel(production.discardedAt ?? "")}. O custo e o consumo de estoque foram mantidos; nenhum pacote está disponível para venda. Para excluir uma produção cadastrada por engano, desfaça o descarte antes.`}>
+      <p className={styles["section-note"]}><strong>Motivo:</strong> {production.discardReason || "Não informado."}</p>
+    </Panel>}
     <div className={styles.columns}>
-      <PackageFlow production={result} report={report} topBuyers={reportPage.data.topBuyers}
+      <PackageFlow production={result} report={report} topBuyers={reportPage.data.topBuyers} disabled={discarded}
         onLostChange={(lostPackages) => update({ lostPackages })} />
       <ProductionFinance production={result} report={report} />
     </div>
@@ -111,14 +142,16 @@ export default function ProductionDetailPage({ production, shelfLifeDays, report
     </div>
     <div className={styles.columns}>
       <ProductionYield production={result} report={report} />
-      <Panel title="Dados da produção" description={standalone
-        ? "Produção avulsa: não consome estoque. O custo total pode ser corrigido."
-        : "As alterações são salvas automaticamente. Receita e lotes ficam travados após a baixa do estoque."}>
+      <Panel title="Dados da produção" description={discarded
+        ? "Produção descartada: desfaça o descarte para alterar os dados."
+        : standalone
+          ? "Produção avulsa: não consome estoque. O custo total pode ser corrigido."
+          : "As alterações são salvas automaticamente. Receita e lotes ficam travados após a baixa do estoque."}>
         <FormLayout onSubmit={(event) => event.preventDefault()}>{fields}</FormLayout>
       </Panel>
     </div>
     <Panel className={styles.section}>
-      <SalePriceSimulation result={result} onPriceChange={(expectedSalePrice) => update({ expectedSalePrice })} />
+      <SalePriceSimulation result={result} disabled={discarded} onPriceChange={(expectedSalePrice) => update({ expectedSalePrice })} />
     </Panel>
     <Panel className={styles.section}>
       <RealizedSales report={report} sales={sales} onViewSales={onViewSales} />
@@ -134,8 +167,11 @@ export default function ProductionDetailPage({ production, shelfLifeDays, report
           </tr>)}</tbody></DataTable>}
         {consumptions.pagination.totalCount > 0 && <Pagination {...consumptions.pagination} label="lotes consumidos" />}
         {consumptions.status === "ready" && !consumptions.pagination.totalCount && <p className={styles["section-note"]}>Produção histórica anterior ao controle de estoque. Seu custo original foi preservado, sem baixas retroativas.</p>}
-        <p className={styles["formula-note"]}>Remover a produção apenas a oculta da lista. O consumo real e os vínculos com os lotes são preservados, sem devolver insumos ao estoque.</p>
+        <p className={styles["formula-note"]}>Excluir a produção apaga o registro e devolve os insumos consumidos ao estoque. Se ela foi realmente feita e perdida, use "Descartar produção" para manter o custo e o consumo.</p>
       </>}
     </Panel>
+    {isDiscarding && <DiscardProductionModal productionDate={production.date} busy={busy}
+      onClose={() => setIsDiscarding(false)}
+      onSubmit={(discard) => runAction(() => discardProduction(production, discard, salesCount), () => setIsDiscarding(false))} />}
   </>;
 }

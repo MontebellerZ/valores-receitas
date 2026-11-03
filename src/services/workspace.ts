@@ -1,33 +1,38 @@
-import type { WorkspaceData, WorkspacePatch, StockLot, StockEntry, StockCorrection } from "../domain/models";
+import type {
+  MarketItemsPatchRequest,
+  ProductionDiscard,
+  ProductionsPatchRequest,
+  RecipesPatchRequest,
+  SalesPatchRequest,
+  StockLot,
+  StockEntry,
+  StockCorrection,
+  WorkspaceRevision,
+} from "../domain/models";
 import { api } from "./http";
 
-const normalizeSnapshot = (data: WorkspaceData): WorkspaceData => ({
-  ...data,
-  productions: data.productions.map((production) => ({
-    ...production,
-    expectedSalePrice: production.expectedSalePrice ?? undefined,
-  })),
-});
+const requireRevision = (data: WorkspaceRevision | undefined) => {
+  if (typeof data?.revision !== "number") throw new Error("A API não informou a nova revisão dos dados.");
+  return { revision: data.revision };
+};
+
+const patchResource = async <TRequest,>(path: string, request: TRequest) => {
+  const { data } = await api.patch<WorkspaceRevision>(path, request);
+  return requireRevision(data);
+};
 
 export const workspaceService = {
-  /** Explicit bulk read, used only by workbook export/import. */
-  async load(signal?: AbortSignal) {
-    const { data } = await api.get<WorkspaceData>("/data", { signal });
-    return normalizeSnapshot(data);
+  patchMarket: (request: MarketItemsPatchRequest) => patchResource("/market", request),
+  patchRecipes: (request: RecipesPatchRequest) => patchResource("/recipes", request),
+  patchProductions: (request: ProductionsPatchRequest) => patchResource("/productions", request),
+  patchSales: (request: SalesPatchRequest) => patchResource("/sales", request),
+  async discardProduction(id: string, discard: ProductionDiscard, revision: number) {
+    const { data } = await api.post<WorkspaceRevision>(`/productions/${encodeURIComponent(id)}/discard`, { ...discard, revision });
+    return requireRevision(data);
   },
-  /** Explicit bulk replacement; ordinary screens save through `patch`. */
-  async save(snapshot: WorkspaceData, signal?: AbortSignal) {
-    const { data } = await api.put<WorkspaceData>("/data", snapshot, { signal });
-    return normalizeSnapshot(data);
-  },
-  /** Incremental save: only changed records and deleted ids; returns the canonical changed records. */
-  async patch(changes: WorkspacePatch, signal?: AbortSignal) {
-    const { data } = await api.patch<WorkspaceData>("/data", changes, { signal });
-    if (typeof data?.revision !== "number") throw new Error("A API não informou a nova revisão dos dados.");
-    return normalizeSnapshot({
-      market: data.market ?? [], recipes: data.recipes ?? [], productions: data.productions ?? [],
-      sales: data.sales ?? [], revision: data.revision,
-    });
+  async restoreProduction(id: string, revision: number) {
+    const { data } = await api.delete<WorkspaceRevision>(`/productions/${encodeURIComponent(id)}/discard`, { params: { revision } });
+    return requireRevision(data);
   },
   async addStock(entry: StockEntry, revision: number) {
     const { data } = await api.post<{ lot: StockLot; lots: StockLot[] | null; revision: number }>("/stock", { ...entry, revision }, { params: { compact: true } });

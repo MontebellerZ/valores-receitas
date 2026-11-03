@@ -77,7 +77,7 @@ export default function Auth({ onAuthenticated }: Props) {
                   mode === "login" ? "current-password" : "new-password"
                 }
                 required
-                minLength={mode === "register" ? 12 : undefined}
+                minLength={mode === "register" ? 8 : undefined}
                 value={password}
                 onChange={(event) => setPassword(event.target.value)}
                 controlSize="large"
@@ -85,7 +85,7 @@ export default function Auth({ onAuthenticated }: Props) {
               />
               {mode === "register" && (
                 <small>
-                  Mínimo de 12 caracteres, com maiúscula, minúscula, número e
+                  Mínimo de 8 caracteres, com maiúscula, minúscula, número e
                   símbolo.
                 </small>
               )}
@@ -97,7 +97,7 @@ export default function Auth({ onAuthenticated }: Props) {
                   type="password"
                   autoComplete="new-password"
                   required
-                  minLength={12}
+                  minLength={8}
                   value={passwordConfirmation}
                   onChange={(event) =>
                     setPasswordConfirmation(event.target.value)
