@@ -101,6 +101,17 @@ Cadastro apenas de nome e unidade, sem dados de embalagem ou preços. Um mesmo i
 - Saldo de pacotes por produção e exclusão de vendas com confirmação.
 - Preservação do custo por pacote no momento do registro da venda.
 
+### Pontos de venda
+
+- Menu **Pontos de venda** (`/pontos-de-venda`): cadastrar, editar e excluir locais, comparar pacotes vendidos, doados, faturamento e custo das saídas. Datas filtram apenas os indicadores de vendas; a disponibilidade continua sendo o saldo atual.
+- O contador do menu lateral mostra o total de pontos cadastrados, sem incluir **Sem ponto**, e é atualizado após cadastros e exclusões.
+- Estoque em cards por ponto e **Sem ponto**, incluindo produções avulsas; cada card resume o total disponível por receita. Ao abrir, veja as produções e escolha o destino em um select pesquisável para transferir uma quantidade disponível. Vendas anteriores não mudam.
+- No formulário de vendas, o local é opcional e começa em **Sem ponto**. Vendas diretas continuam possíveis mesmo com pontos cadastrados, mas usam somente o estoque não distribuído. Cada item do carrinho reserva pacotes na sua produção e local; editar devolve a quantidade ao local original antes de validar a nova seleção. O histórico exibe a coluna **Local**.
+- Vendas que consumiram estoque **Sem ponto** podem ser reclassificadas para um ponto cadastrado mantendo a produção e a quantidade, mesmo sem estoque no destino. Isso muda os indicadores do local na data original da venda, sem movimentar estoque. É possível reclassificar novamente ou voltar para Sem ponto; excluir devolve os pacotes para Sem ponto. Alterações de produção ou quantidade seguem a validação normal do estoque do local escolhido.
+- Pontos com estoque ou histórico de vendas vinculadas (inclusive vendas excluídas) não podem ser excluídos. Transfira o saldo antes de excluir um ponto sem histórico; as rejeições do servidor mantêm o formulário e usam as notificações existentes. O nome exibido no histórico de vendas é o nome atual informado pelo servidor.
+- Produções com pacotes alocados não podem ser excluídas. Perdas só podem consumir o saldo em Sem ponto: redistribua antes quando necessário. Descartar uma produção oculta seu estoque; desfazer o descarte restaura a mesma distribuição.
+- API: `/sale-points`, `/sale-points/inventory` e `/sale-points/allocations/{productionId}`. As gravações usam a revisão e a fila do workspace, com atualização das consultas após salvar. Como a exclusão retorna HTTP 204, o frontend consulta o resumo para obter a nova revisão antes da próxima gravação.
+
 ## Fluxo de uso
 
 1. Cadastre os itens em **Insumos** e registre os pacotes comprados em **Estoque**.
@@ -271,6 +282,7 @@ src/
 		recipes/           Lista e detalhe de receitas
 		production/        Lista e detalhe de produção
 		sales/             Histórico e controle de vendas
+		sale-points/       Locais, estoque distribuído e comparação de resultados
 	services/            HTTP, endpoints e armazenamento
 	styles/              Mixins SCSS compartilhados, usados dentro dos módulos
 	types/               Contratos de interface
@@ -289,13 +301,13 @@ As telas não conhecem endpoints nem acessam o armazenamento diretamente. Os com
 | [FormField](src/components/ui/FormField/index.tsx) | Rótulo e composição de campo, nas variantes padrão, cadastro e horizontal; envolve o controle e preserva `htmlFor`. |
 | [FormControl](src/components/ui/FormControl/index.tsx) | Inputs e textarea, com ícones, prefixos, sufixos e tamanhos. |
 | [SearchField](src/components/ui/SearchField/index.tsx) | Busca com ícone e nome acessível; usado em insumos, receitas, produções, estoque e vendas. A rota envia o texto ao servidor com atraso curto (debounce). |
-| [SearchableSelect](src/components/ui/SearchableSelect/index.tsx) | Todos os selects, com pesquisa, validação de seleção e navegação por teclado. Com `remote`, delega pesquisa e “Carregar mais” ao consumidor. |
+| [SearchableSelect](src/components/ui/SearchableSelect/index.tsx) | Todos os selects, com pesquisa, validação de seleção e navegação por teclado. Com `remote`, delega pesquisa e “Carregar mais” ao consumidor. `openOnFocus={false}` mantém a lista fechada ao receber foco; clique, digitação e setas continuam abrindo. Usado na produção do modal de edição de venda. |
 | [RemoteSelect](src/components/ui/RemoteSelect/index.tsx) | `SearchableSelect` alimentado por um endpoint paginado: busca somente quando aberto, pesquisa no servidor e mantém o rótulo do valor selecionado mesmo fora da página carregada. |
 | [Pagination](src/components/ui/Pagination/index.tsx) | Intervalo exibido, total, tamanho da página (10/25/50/100) e navegação anterior/próxima de todas as listagens. |
 | [FormActions](src/components/ui/FormActions/index.tsx) | Rodapé de cancelar/enviar nos cadastros de insumos, estoque, receitas, produção e vendas; recebe conteúdo, estado de bloqueio e classe de composição. |
 | [FormLayout e FormGrid](src/components/ui/FormLayout/index.tsx) | Estrutura de formulário com fieldset desabilitável e grade responsiva ou flexível. Usados nos cadastros, ajustes de estoque e formulário de venda; as telas não importam estilos internos do modal. |
 | [Panel](src/components/ui/Panel/index.tsx) | Seções com título associado por ID único, descrição e ações. Variantes card, plain e inset, usadas em insumos, estoque, receitas, produção, vendas e visão geral. |
-| [DataTable](src/components/ui/DataTable/index.tsx) | Tabela com rolagem horizontal e variantes padrão, vendas e compacta. Cabeçalhos de dados alternam entre ordem crescente e decrescente, com indicador visual, teclado e `aria-sort`. Recebe elementos nativos; cada `td` informa seu valor bruto em `data-sort-value` (número, texto ou data ISO). Colunas sem esse atributo, como ações, não são ordenáveis. `defaultSort={{ column: 1, direction: "descending" }}` define a coluna inicial pelo índice, começando em zero. Com `serverSort` (mapas em `src/domain/sortColumns.ts`), somente as colunas mapeadas para campos aceitos pela API são ordenáveis e as linhas são exibidas na ordem recebida. |
+| [DataTable](src/components/ui/DataTable/index.tsx) | Tabela com rolagem horizontal e variantes padrão, vendas e compacta. Linhas recebem destaque suave ao passar o mouse ou focar uma ação pelo teclado. Cabeçalhos de dados alternam entre ordem crescente e decrescente, com indicador visual, teclado e `aria-sort`. Recebe elementos nativos; cada `td` informa seu valor bruto em `data-sort-value` (número, texto ou data ISO). Colunas sem esse atributo, como ações, não são ordenáveis. `defaultSort={{ column: 1, direction: "descending" }}` define a coluna inicial pelo índice, começando em zero. Com `serverSort` (mapas em `src/domain/sortColumns.ts`), somente as colunas mapeadas para campos aceitos pela API são ordenáveis e as linhas são exibidas na ordem recebida. |
 | [EmptyState](src/components/ui/EmptyState/index.tsx) | Mensagem vazia inline ou painel de editor, com título, ícone e ação opcionais. |
 | [SummaryItem e SummaryList](src/components/ui/SummaryItem/index.tsx) | Listas de receitas e produções, com identificação, métricas e ação de visualização; responsividade definida uma única vez. |
 | [Dialog](src/components/ui/Dialog/index.tsx) | Base de modal: semântica acessível, foco inicial, contenção de Tab/Shift+Tab, restauração do foco, Escape e clique no fundo. Reutilizado por `RegistrationModal` e `ConfirmDeleteDialog`; o Escape do select fecha primeiro suas opções. |

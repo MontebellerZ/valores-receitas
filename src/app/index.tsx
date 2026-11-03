@@ -12,6 +12,7 @@ const ProductionDetailRoute = lazy(() => import("./routes/ProductionDetailRoute"
 const MarketRoute = lazy(() => import("./routes/MarketRoute"));
 const StockRoute = lazy(() => import("./routes/StockRoute"));
 const SalesRoute = lazy(() => import("./routes/SalesRoute"));
+const SalePointsRoute = lazy(() => import("./routes/SalePointsRoute"));
 const NotFoundPage = lazy(() => import("../pages/not-found/NotFoundPage"));
 
 
@@ -71,6 +72,7 @@ export default function App() {
           <Route path="/mercado" element={<Navigate to={paths.market} replace />} />
           <Route path={paths.stock} element={<StockRoute />} />
           <Route path={paths.sales} element={<SalesRoute />} />
+          <Route path={paths.salePoints} element={<SalePointsRoute />} />
           <Route path={paths.saleNew} element={<SalesRoute />} />
           <Route path={paths.saleEditPattern} element={<SalesRoute />} />
           <Route path="*" element={<NotFoundPage />} />

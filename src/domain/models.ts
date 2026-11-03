@@ -97,6 +97,9 @@ export type CalculatedProduction = Production & {
 
 export type Sale = {
   id: string;
+  salePointId?: string | null;
+  readonly salePointName?: string | null;
+  readonly usesUnassignedStock?: boolean;
   productionId: string;
   productionDate: string;
   recipeName: string;
@@ -113,6 +116,7 @@ export type Sale = {
 export type SaleDraft = Pick<
   Sale,
   | "productionId"
+  | "salePointId"
   | "date"
   | "packages"
   | "pricePerPackage"
@@ -121,6 +125,26 @@ export type SaleDraft = Pick<
   | "donated"
   | "notes"
 > & { id?: string };
+
+export type SalePoint = { id: string; name: string };
+export type SalePointSummary = {
+  id: string | null;
+  name: string;
+  availablePackages: number;
+  soldPackages: number;
+  donatedPackages: number;
+  revenue: number;
+  cost: number;
+};
+export type SalePointInventory = {
+  productionId: string;
+  recipeName: string;
+  date: string;
+  salePointId: string | null;
+  salePointName: string;
+  packages: number;
+};
+export type SalePointAllocation = { salePointId: string; packages: number };
 export type UserSession = { id: string; email: string };
 export type WorkspaceRevision = { revision: number };
 export type MarketItemsPatchRequest = { changed: MarketItem[]; deleted: string[]; revision: number };

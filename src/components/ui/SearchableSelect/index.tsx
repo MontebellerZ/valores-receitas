@@ -37,6 +37,7 @@ type Props<T extends string> = {
   "aria-invalid"?: ComponentProps<"input">["aria-invalid"];
   /** Label of the current value when it is not among the loaded options (remote lists). */
   selectedLabel?: string;
+  openOnFocus?: boolean;
   /** Server-side search: options are rendered as received and more pages load on demand. */
   remote?: RemoteOptions;
 };
@@ -65,6 +66,7 @@ export default function SearchableSelect<T extends string>({
   "aria-describedby": ariaDescribedBy,
   "aria-invalid": ariaInvalid,
   selectedLabel,
+  openOnFocus = true,
   remote,
 }: Props<T>) {
   const selectId = useId();
@@ -216,7 +218,7 @@ export default function SearchableSelect<T extends string>({
         disabled={disabled}
         onFocus={() => {
           changeQuery("");
-          changeOpen(true);
+          if (openOnFocus) changeOpen(true);
           setActiveIndex(0);
         }}
         onBlur={() => {

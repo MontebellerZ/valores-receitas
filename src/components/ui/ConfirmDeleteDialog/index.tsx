@@ -5,7 +5,7 @@ import type { PendingDelete } from "../../../types/navigation";
 import Icon from "../Icon";
 
 type Props = {
-  pendingDelete: PendingDelete | { kind: "stock"; id: string; label: string } | null;
+  pendingDelete: PendingDelete | { kind: "stock" | "salePoint"; id: string; label: string } | null;
   onCancel: () => void;
   onConfirm: () => void;
   busy?: boolean;
@@ -33,7 +33,9 @@ export default function ConfirmDeleteDialog({
         </div>
         <h2 id="confirm-title">Confirmar exclusão?</h2>
         <p id="confirm-description">
-          {pendingDelete.kind === "stock"
+          {pendingDelete.kind === "salePoint"
+            ? `O ponto “${pendingDelete.label}” será excluído. Pontos com estoque ou vendas vinculadas não podem ser excluídos; transfira o estoque antes.`
+            : pendingDelete.kind === "stock"
             ? `O pacote “${pendingDelete.label}” será excluído permanentemente. Somente pacotes sem consumo, baixa ou correção podem ser excluídos. Os demais pacotes da compra não serão alterados.`
             : pendingDelete.kind === "recipe"
             ? `A receita “${pendingDelete.label}” será excluída permanentemente.`

@@ -11,6 +11,7 @@ export const paths = {
   market: "/insumos",
   stock: "/estoque",
   sales: "/vendas",
+  salePoints: "/pontos-de-venda",
   saleNew: "/vendas/nova",
   saleEditPattern: "/vendas/:saleId/editar",
   saleEdit: (id: string) => `/vendas/${encodeURIComponent(id)}/editar`,

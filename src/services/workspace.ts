@@ -25,7 +25,14 @@ export const workspaceService = {
   patchMarket: (request: MarketItemsPatchRequest) => patchResource("/market", request),
   patchRecipes: (request: RecipesPatchRequest) => patchResource("/recipes", request),
   patchProductions: (request: ProductionsPatchRequest) => patchResource("/productions", request),
-  patchSales: (request: SalesPatchRequest) => patchResource("/sales", request),
+  patchSales: (request: SalesPatchRequest) => patchResource("/sales", {
+    ...request,
+    changed: request.changed.map(({ salePointName, usesUnassignedStock, ...sale }) => {
+      void salePointName;
+      void usesUnassignedStock;
+      return sale;
+    }),
+  }),
   async discardProduction(id: string, discard: ProductionDiscard, revision: number) {
     const { data } = await api.post<WorkspaceRevision>(`/productions/${encodeURIComponent(id)}/discard`, { ...discard, revision });
     return requireRevision(data);

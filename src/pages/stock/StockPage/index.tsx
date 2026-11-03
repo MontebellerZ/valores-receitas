@@ -90,7 +90,7 @@ export default function StockPage({
   return <>
     <PageHeader title="Estoque" description="Registre cada pacote comprado. As produções consomem primeiro os lotes mais antigos (FIFO), usando o preço de cada compra."
       action={<Button disabled={disabled || busy || !marketCount} onClick={() => setIsAdding(true)}><Icon name="plus" size={17} /> Registrar compra</Button>} />
-    {disabled && <p role="alert">Estoque indisponível para alterações. Recarregue a página para conectar ao servidor.</p>}
+    {disabled && <EmptyState role="alert">Estoque indisponível para alterações. Recarregue a página para conectar ao servidor.</EmptyState>}
     <Panel title="Entrada de pacote">
       <p className={styles["formula-note"]}>Use “Registrar compra” para informar o insumo, a data e os dados do pacote.</p>
       <p className={styles["formula-note"]}>Cada entrada representa um pacote. Informe a quantidade na unidade do insumo e o preço pago; um mesmo insumo pode ter pacotes de tamanhos diferentes.</p>
@@ -102,7 +102,7 @@ export default function StockPage({
       <p className={styles["formula-note"]}>“Editar compra” inclui todos os pacotes cadastrados juntos, mesmo os esgotados. Compras distintas não podem ser editadas em conjunto.</p>
       <div className={styles["stock-totals"]} aria-busy={totals.status === "loading"}>{totals.items.map((item) => <MetricCard variant="stock" key={item.id}
         label={item.name} value={<>{number(item.quantity, 4)} {item.unit}</>} />)}</div>
-      {totals.status === "error" && <p role="alert">Não foi possível carregar os saldos por insumo.</p>}
+      {totals.status === "error" && <EmptyState role="alert">Não foi possível carregar os saldos por insumo.</EmptyState>}
       {totals.pagination.totalCount > 0 && <Pagination {...totals.pagination} label="saldos por insumo" />}
       <DataTable serverSort={lotPage.serverSort} aria-busy={lotPage.status === "loading"}><thead><tr><th>Insumo / lote</th><th>Compra</th><th>Qtd. comprada</th><th>Preço do pacote</th><th>Restante</th><th>Ações</th></tr></thead><tbody>{filtered.map((lot) => {
         const purchaseSize = lot.purchaseLotCount;

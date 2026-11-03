@@ -12,6 +12,7 @@ import { toast } from "react-toastify";
 import Icon from "../../../components/ui/Icon";
 import PageHeader from "../../../components/ui/PageHeader";
 import type { Production, ProductionDiscard, ProductionReportPage, ProductionSale, StockConsumption } from "../../../domain/models";
+import EmptyState from "../../../components/ui/EmptyState";
 import type { ListControls, QueryStatus } from "../../../hooks/usePagedQuery";
 import type { ProductionSalesStats } from "../../../domain/workspaceRules";
 import type { PendingDelete } from "../../../types/navigation";
@@ -103,7 +104,7 @@ export default function ProductionDetailPage({ production, shelfLifeDays, report
   if (!reportPage.data) return <>
     <BackButton onClick={onBack}>Voltar para produção</BackButton>
     {reportPage.status === "error"
-      ? <p role="alert">Não foi possível carregar o relatório desta produção. Recarregue a página.</p>
+      ? <EmptyState role="alert">Não foi possível carregar o relatório desta produção. Recarregue a página.</EmptyState>
       : <div role="status">Carregando relatório da produção...</div>}
   </>;
   const report = buildProductionReport(result, reportPage.data);
@@ -160,7 +161,7 @@ export default function ProductionDetailPage({ production, shelfLifeDays, report
       description={standalone ? undefined : `Custo total dos insumos: ${money(result.cost)}`}>
       {standalone ? <p className={styles["section-note"]}>Produção avulsa registrada sem vínculo com o estoque. Nenhum lote foi consumido.</p> : <>
         {consumptions.status === "loading" && !consumptions.items.length && <p role="status">Carregando consumos...</p>}
-        {consumptions.status === "error" && <p role="alert">Falha ao consultar os lotes. Recarregue a página.</p>}
+        {consumptions.status === "error" && <EmptyState role="alert">Falha ao consultar os lotes. Recarregue a página.</EmptyState>}
         {consumptions.items.length > 0 && <DataTable serverSort={consumptions.serverSort} aria-busy={consumptions.status === "loading"}><thead><tr><th>Insumo / lote</th><th>Compra</th><th>Quantidade usada</th><th>Custo</th></tr></thead><tbody>{consumptions.items.map((item) => <tr key={item.stockLotId}>
             <td>{item.itemName}<small className={styles["stock-lot-id"]}>{item.stockLotId}</small></td><td>{item.entryDate.split("-").reverse().join("/")}</td>
             <td>{number(item.quantity, 4)} {item.unit}</td><td>{money(item.cost)}</td>

@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useMatch, useNavigate, useParams } from "react-router-dom";
 import SalesPage from "../../../pages/sales/SalesPage";
 import NotFoundPage from "../../../pages/not-found/NotFoundPage";
+import EmptyState from "../../../components/ui/EmptyState";
 import { useWorkspaceContext } from "../../../hooks/useWorkspaceContext";
 import { useDebouncedValue } from "../../../hooks/useDebouncedValue";
 import { listControls, usePagedQuery } from "../../../hooks/usePagedQuery";
@@ -11,6 +12,7 @@ import { balanceSortColumns, salesSortColumns } from "../../../domain/sortColumn
 import { paths } from "../../paths";
 import SaleForm from "../../../components/sales/SaleForm";
 import { useSalesReport } from "../../../hooks/useSalesReport";
+import { useSalePointData } from "../../../hooks/useSalePointData";
 import { dateKey, periodStart, type Period } from "../../../domain/overview";
 
 /** Most recent production that still has packages to sell. */
@@ -19,6 +21,7 @@ const loadFirstAvailable = async (_scope: string, signal: AbortSignal) =>
 
 export default function SalesRoute() {
   const workspace = useWorkspaceContext();
+  const pointData = useSalePointData(workspace.dataVersion);
   const navigate = useNavigate();
   const { saleId } = useParams();
   const isNewRoute = useMatch(paths.saleNew) !== null;
@@ -93,11 +96,12 @@ export default function SalesRoute() {
         }
       />
       {saleId && editing.status === "loading" && <div role="status">Carregando venda...</div>}
-      {saleId && editing.status === "error" && <p role="alert">Não foi possível carregar a venda. Recarregue a página.</p>}
+      {saleId && editing.status === "error" && <EmptyState role="alert">Não foi possível carregar a venda. Recarregue a página.</EmptyState>}
       {creating && firstAvailable.status === "loading" && <div role="status">Carregando produções disponíveis...</div>}
       {creating && firstAvailable.status !== "loading" && (
         <SaleForm
           key="new-sale"
+          {...pointData}
           initialBalance={firstAvailable.data}
           totalAvailable={workspace.summary?.availablePackages ?? 0}
           onSave={workspace.saveSale}
@@ -109,6 +113,7 @@ export default function SalesRoute() {
       {editingReady && editing.data && (
         <SaleForm
           key={editing.data.id}
+          {...pointData}
           initialBalance={editingBalance.data}
           totalAvailable={workspace.summary?.availablePackages ?? 0}
           sale={editing.data}

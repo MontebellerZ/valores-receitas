@@ -129,7 +129,7 @@ export default function Overview({
       </Panel>
 
       {financial.status === "error" || financial.status === "missing" ?
-        <Panel><p role="alert">Não foi possível carregar os resultados do negócio. Recarregue a página para tentar novamente.</p></Panel>
+        <Panel><EmptyState role="alert">Não foi possível carregar os resultados do negócio. Recarregue a página para tentar novamente.</EmptyState></Panel>
         : !totals ? <Panel><p role="status">Carregando resultados do negócio...</p></Panel> : <>
         <section className={styles.hero} aria-label="Resultados do negócio">
           <div className={styles["hero-heading"]}>
@@ -182,7 +182,7 @@ export default function Overview({
         </div>
       </>}
 
-      {summaryStatus === "error" ? <Panel><p role="alert">Não foi possível carregar os indicadores de produção e estoque. Recarregue a página para tentar novamente.</p></Panel>
+      {summaryStatus === "error" ? <Panel><EmptyState role="alert">Não foi possível carregar os indicadores de produção e estoque. Recarregue a página para tentar novamente.</EmptyState></Panel>
         : summaryStatus !== "ready" ? <Panel><p role="status">Carregando produção e estoque...</p></Panel> : <>
       <section className={styles["operations-band"]} aria-label="Produção e estoque do período">
         <div><Package size={21} aria-hidden="true" /><span>DA PRODUÇÃO À VENDA<small>{count(planning.count)} produções no período</small></span></div>

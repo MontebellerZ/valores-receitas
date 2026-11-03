@@ -357,6 +357,10 @@ export function useWorkspace(userId: string) {
     updateProduction,
     saveSale,
     saveSales,
+    saveSalePoint: withConfirmation("Salvar este ponto de venda?", data.saveSalePoint),
+    deleteSalePoint: data.deleteSalePoint,
+    allocateSalePoint: withConfirmation("Transferir os pacotes para o local escolhido? As vendas já registradas não serão alteradas.", data.allocateSalePoint),
+    canManageSalePoints: data.canSave,
     confirmDelete,
   };
 }

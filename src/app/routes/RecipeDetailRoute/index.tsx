@@ -2,6 +2,7 @@ import { useCallback, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import RecipeDetailPage from "../../../pages/recipes/RecipeDetailPage";
 import NotFoundPage from "../../../pages/not-found/NotFoundPage";
+import EmptyState from "../../../components/ui/EmptyState";
 import { useWorkspaceContext } from "../../../hooks/useWorkspaceContext";
 import { useResource } from "../../../hooks/useResource";
 import { useDebouncedValue } from "../../../hooks/useDebouncedValue";
@@ -27,7 +28,7 @@ export default function RecipeDetailRoute() {
   if (resource.status === "loading")
     return <div role="status">Carregando receita...</div>;
   if (resource.status === "error")
-    return <div role="alert">Não foi possível carregar a receita. Recarregue a página para tentar novamente.</div>;
+    return <EmptyState role="alert">Não foi possível carregar a receita. Recarregue a página para tentar novamente.</EmptyState>;
   if (resource.status === "missing")
     return (
       <NotFoundPage

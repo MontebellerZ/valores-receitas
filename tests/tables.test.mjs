@@ -155,7 +155,7 @@ test("all table consumers expose server-sortable data columns while preserving a
     [Ingredients, { ...controls([], columns.recipeIngredientSortColumns, "name"),
       rows: [{ id: "ingredient", marketItemId: "flour", quantity: 100 }], totalCount: 1, selectedIds: ["flour"],
       hasEmptyRow: false, marketCount: 1, onChange: noop, onAdd: noop, onRemove: noop }, 3],
-    [Sales, salesProps([sale]), 11],
+    [Sales, salesProps([sale]), 9],
     [Overview, { period: "month", onPeriodChange: noop, range: { start: "2026-10-01", end: "2026-10-31" }, summary,
       summaryStatus: "ready", financial: { status: "loading" }, progress: controls([balance], {}), productions: controls([balance], columns.overviewBalanceSortColumns),
       recentSales: controls([sale], columns.overviewSalesSortColumns), recipeCount: 1, marketCount: 1, importAction: null,
@@ -170,6 +170,9 @@ test("all table consumers expose server-sortable data columns while preserving a
   for (const [Component, props, count] of cases) {
     assert.equal((render(Component, props).match(/aria-sort=/g) ?? []).length, count, Component.name);
   }
+  const salesHtml = render(Sales, salesProps([sale]));
+  assert.match(salesHtml, /<th>Cliente<\/th>/);
+  assert.match(salesHtml, /<th>Pagamento<\/th>/);
   assert.match(render(RealizedSales, cases[4][1]), /Faturamento acumulado[\s\S]*R\$\s6,00/);
   for (const [paid, label] of [[false, "A receber"], [true, "Recebido"]]) {
     const html = render(Sales, salesProps([{ ...sale, paid }]));

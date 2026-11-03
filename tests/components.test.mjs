@@ -213,8 +213,8 @@ test("all application selects reuse the shared searchable select", async () => {
   }
   // RemoteSelect is the server-searched variant built on SearchableSelect; Pagination picks the page size.
   assert.deepEqual([...new Set(consumers)].sort(), [
-    "OverviewPage", "Pagination", "ProductionFields", "RecipeIngredientsEditor", "RemoteSelect", "SaleForm", "SalesPage",
-    "StockEntryFields",
+    "OverviewPage", "Pagination", "ProductionFields", "RecipeIngredientsEditor", "RemoteSelect", "SaleForm", "SalePointsPage",
+    "SalesPage", "StockEntryFields",
   ].sort());
 });
 
@@ -389,7 +389,7 @@ test("sales registration renders one editor and a selectable cart sidebar while 
   assert.match(cart, /Cliente não informado/);
   assert.match(cart, /1 pacote\(s\)/);
   assert.equal((cart.match(/type="number"/g) ?? []).length, 1);
-  assert.equal((cart.match(/role="combobox"/g) ?? []).length, 1);
+  assert.equal((cart.match(/role="combobox"/g) ?? []).length, 2);
   assert.doesNotMatch(cart, /Remover venda 1/);
   const cartModal = render(SaleForm, { ...props, isModal: true });
   assert.ok(cartModal.includes(modalStyles["modal-wide"]));
@@ -493,7 +493,7 @@ test("layout retains active navigation and each synchronization state", async ()
   const { default: styles } = await load(path.join("components", "layout", "AppLayout", "styles.module.scss"));
   const props = {
     session: { id: "test", email: "test@example.test" },
-    recipeCount: 1, productionCount: 2, salesCount: 3, marketCount: 4,
+    recipeCount: 1, productionCount: 2, salesCount: 3, marketCount: 4, salePointCount: 5,
     signOut() { },
   };
   for (const apiStatus of ["error", "saving", "connecting", "connected"]) {
@@ -506,6 +506,15 @@ test("layout retains active navigation and each synchronization state", async ()
     assert.equal(html.includes(styles["is-error"]), apiStatus === "error");
     assert.equal(html.includes(styles["is-saving"]), apiStatus === "saving" || apiStatus === "connecting");
     assert.ok(html.includes(styles["status-dot"]));
+    assert.match(html, new RegExp(`href="/pontos-de-venda"[^>]*>[\\s\\S]*?<span class="${styles["nav-count"]}">5</span></a>`));
+  }
+  for (const salePointCount of [0, undefined]) {
+    const html = renderToStaticMarkup(createElement(MemoryRouter, null,
+      createElement(AppLayout, { ...props, apiStatus: "connected", salePointCount })));
+    const link = html.match(/<a[^>]*href="\/pontos-de-venda"[^>]*>[\s\S]*?<\/a>/)?.[0];
+    assert.ok(link);
+    assert.equal(link.includes(styles["nav-count"]), salePointCount !== undefined);
+    if (salePointCount === 0) assert.ok(link.includes(">0</span>"));
   }
 });
 
@@ -521,6 +530,12 @@ test("responsive styles and portal/dialog rules survive Sass compilation", () =>
   const dialog = cssFor("components", "ui", "ConfirmDeleteDialog");
   assert.match(dialog, /@keyframes confirm-enter/);
   assert.match(dialog, /prefers-reduced-motion: reduce/);
+  const table = cssFor("components", "ui", "DataTable");
+  assert.match(table, /\.data-table > tbody > tr\s*\{\s*transition: background-color 120ms ease;/);
+  assert.match(table, /background-image: linear-gradient\(to right, #fff, transparent 24px, transparent calc\(100% - 24px\), #fff\);/);
+  assert.match(table, /\.data-table > tbody > tr:focus-within\s*\{\s*background-color: #f4f7f4;/);
+  assert.match(table, /@media \(hover: hover\)\s*\{\s*\.data-table > tbody > tr:hover\s*\{\s*background-color: #f4f7f4;/);
+  assert.match(table, /@media \(prefers-reduced-motion: reduce\)\s*\{\s*\.data-table > tbody > tr\s*\{\s*transition: none;/);
   const actions = postcss.parse(cssFor("pages", "overview", "OverviewPage"));
   const mobileSizes = [];
   actions.walkRules((rule) => {

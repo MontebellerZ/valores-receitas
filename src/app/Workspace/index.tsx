@@ -7,11 +7,13 @@ import ConfirmSaveDialog from "../../components/ui/ConfirmSaveDialog";
 import UnsavedChangesBar from "../../components/ui/UnsavedChangesBar";
 import type { UserSession } from "../../domain/models";
 import { useWorkspace } from "../../hooks/useWorkspace";
+import { useSalePoints } from "../../hooks/useSalePointData";
 
 type Props = { session: UserSession; signOut: () => void };
 
 export default function Workspace({ session, signOut }: Props) {
   const workspace = useWorkspace(session.id);
+  const salePoints = useSalePoints(workspace.dataVersion);
   const [signOutRequested, setSignOutRequested] = useState(false);
   const requestSignOut = () => {
     if (workspace.isDirty()) setSignOutRequested(true);
@@ -27,6 +29,7 @@ export default function Workspace({ session, signOut }: Props) {
         productionCount={workspace.counts.productions}
         salesCount={workspace.counts.sales}
         marketCount={workspace.counts.market}
+        salePointCount={salePoints.status === "ready" ? salePoints.data.filter((point) => point.id !== null).length : undefined}
         signOut={requestSignOut}
       >
         {workspace.hasUnsavedChanges && (

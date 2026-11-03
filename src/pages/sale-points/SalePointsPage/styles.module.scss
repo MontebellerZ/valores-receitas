@@ -1,0 +1,92 @@
+@use "../../../styles/shared";
+
+@include shared.feedback;
+
+.sections {
+  display: grid;
+  gap: 1.5rem;
+}
+
+.actions {
+  display: flex;
+  gap: .5rem;
+  flex-wrap: wrap;
+}
+
+.point-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr));
+  gap: 12px;
+}
+
+.point-card {
+  display: grid;
+  align-content: start;
+  justify-content: stretch;
+  align-items: start;
+  gap: 12px;
+  width: 100%;
+  height: auto;
+  min-width: 0;
+  padding: 16px;
+  border: 1px solid #e6e9e3;
+  border-radius: 10px;
+  background: #fff;
+  color: #343b34;
+  font: inherit;
+  text-align: left;
+  white-space: normal;
+  transition: border-color .15s ease, box-shadow .15s ease;
+
+  &:hover {
+    border-color: #cbd8cc;
+    box-shadow: 0 3px 12px rgba(32, 42, 31, .06);
+  }
+
+  &:focus-visible {
+    outline: 3px solid #aec9b4;
+    outline-offset: 2px;
+  }
+
+}
+
+.point-card-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-family: Manrope, sans-serif;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.point-card-recipes {
+  display: grid;
+  gap: 7px;
+
+  > span {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    color: #777f76;
+    font-size: 12px;
+  }
+
+  > span > span {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  strong {
+    flex: none;
+    color: #343b34;
+    font-weight: 600;
+  }
+}
+
+.point-card-empty {
+  color: #9da39a;
+  font-size: 11px;
+}

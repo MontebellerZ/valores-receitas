@@ -2,6 +2,27 @@
 
 @include shared.tables;
 
+.data-table > tbody > tr {
+  transition: background-color 120ms ease;
+  background-image: linear-gradient(to right, #fff, transparent 24px, transparent calc(100% - 24px), #fff);
+}
+
+.data-table > tbody > tr:focus-within {
+  background-color: #f4f7f4;
+}
+
+@media (hover: hover) {
+  .data-table > tbody > tr:hover {
+    background-color: #f4f7f4;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .data-table > tbody > tr {
+    transition: none;
+  }
+}
+
 .data-table .sort-button {
   display: inline-flex;
   align-items: center;

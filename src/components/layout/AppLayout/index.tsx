@@ -16,6 +16,7 @@ type Props = {
   productionCount: number;
   salesCount: number;
   marketCount: number;
+  salePointCount: number | undefined;
   children: ReactNode;
   signOut: () => void;
   hasUnsavedChanges: boolean;
@@ -28,6 +29,7 @@ export default function AppLayout({
   productionCount,
   salesCount,
   marketCount,
+  salePointCount,
   children,
   signOut,
   hasUnsavedChanges,
@@ -48,6 +50,7 @@ export default function AppLayout({
             ? "Vendas"
             : pathname === paths.market
               ? "Insumos"
+              : pathname === paths.salePoints ? "Pontos de venda"
               : pathname === paths.stock ? "Estoque" : "Página não encontrada";
   const navClassName = ({ isActive }: { isActive: boolean }) =>
     isActive ? styles["nav-item"] + " " + styles["active"] : styles["nav-item"];
@@ -95,6 +98,10 @@ export default function AppLayout({
           <NavLink className={navClassName} to={paths.market}>
             <Icon name="market" /> Insumos{" "}
             <span className={styles["nav-count"]}>{marketCount}</span>
+          </NavLink>
+          <NavLink className={navClassName} to={paths.salePoints}>
+            <Icon name="market" /> Pontos de venda{" "}
+            {salePointCount !== undefined && <span className={styles["nav-count"]}>{salePointCount}</span>}
           </NavLink>
           <NavLink className={navClassName} to={paths.stock}>
             <Icon name="package" /> Estoque
@@ -173,4 +180,3 @@ export default function AppLayout({
     </div>
   );
 }
-

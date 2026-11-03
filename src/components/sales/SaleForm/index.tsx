@@ -2,7 +2,12 @@ import FormActions from "../../ui/FormActions";
 import FormLayout, { FormGrid } from "../../ui/FormLayout";
 import FormField from "../../ui/FormField";
 import FormControl from "../../ui/FormControl";
+import EmptyState from "../../ui/EmptyState";
 import RemoteSelect from "../../ui/RemoteSelect";
+import SearchableSelect from "../../ui/SearchableSelect";
+import type { Resource } from "../../../hooks/useResource";
+import type { SalePointInventory, SalePointSummary } from "../../../domain/models";
+import { canReclassifySale, locationAvailable } from "../../../domain/salePoints";
 import styles from "./styles.module.scss";
 import PageHeader from "../../ui/PageHeader";
 import { useEffect, useRef, useState, type FormEvent } from "react";
@@ -31,6 +36,8 @@ type Props = {
   initialBalance?: ProductionBalance | null;
   /** Packages available across every production (server summary), used to limit the cart. */
   totalAvailable: number;
+  inventory?: Resource<SalePointInventory[]>;
+  points?: Resource<SalePointSummary[]>;
   onSave: (draft: SaleDraft) => Promise<string | undefined | null>;
   onSaveSales: (drafts: SaleDraft[]) => Promise<string | undefined | null>;
 };
@@ -40,6 +47,7 @@ const priceText = (value: number) => String(value).replace(".", ",");
 type SaleEntry = {
   key: string;
   productionId: string;
+  salePointId: string;
   date: string;
   packages: string;
   price: string;
@@ -63,6 +71,8 @@ function parseAmount(entry: SaleEntry) {
 export default function SaleForm({
   initialBalance,
   totalAvailable,
+  inventory,
+  points,
   sale,
   onSave,
   onSaveSales,
@@ -82,6 +92,7 @@ export default function SaleForm({
   const createEntry = (production?: ProductionBalance, existing?: Sale): SaleEntry => ({
     key: makeId(),
     productionId: existing?.productionId ?? production?.id ?? "",
+    salePointId: existing?.salePointId ?? "",
     date: existing?.date ?? today(),
     packages: String(existing?.packages ?? 1),
     price: priceText(existing?.pricePerPackage ?? production?.expectedSalePrice ?? production?.salePrice ?? 0),
@@ -111,8 +122,19 @@ export default function SaleForm({
         const quantity = Number(entry.packages);
         return total + (Number.isInteger(quantity) && quantity > 0 ? quantity : 0);
       }, 0);
-  const availablePackages = (production: ProductionBalance, exceptKey?: string) =>
-    remainingPackages(production, soldPackages(production) + reservedPackages(production.id, exceptKey));
+  const availablePackages = (production: ProductionBalance, exceptKey?: string, pointId?: string) => {
+    if (!inventory) return remainingPackages(production, soldPackages(production) + reservedPackages(production.id, exceptKey));
+    if (inventory.status !== "ready") return 0;
+    const entry = entries.find((item) => item.key === exceptKey);
+    if (entry && sale && canReclassifySale(sale, production.id, Number(entry.packages))) return sale.packages;
+    const location = pointId ?? entries.find((entry) => entry.key === exceptKey)?.salePointId ?? "";
+    const reservations = entries.filter((entry) => entry.key !== exceptKey).map((entry) => ({
+      productionId: entry.productionId, salePointId: entry.salePointId || null, packages: Number(entry.packages),
+      date: entry.date, pricePerPackage: 0, customer: "", paid: true, notes: "",
+    }));
+    return locationAvailable(inventory.data, production.id, location || null, sale, reservations);
+  };
+  const locationsReady = (!inventory || inventory.status === "ready") && (!points || points.status === "ready");
   const cartPackages = entries.reduce((total, entry) => {
     const quantity = Number(entry.packages);
     return total + (Number.isInteger(quantity) && quantity > 0 ? quantity : 0);
@@ -124,7 +146,7 @@ export default function SaleForm({
 
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (isSaving) return;
+    if (isSaving || !locationsReady) return;
     const drafts: SaleDraft[] = [];
     for (const [index, entry] of entries.entries()) {
       const selected = known[entry.productionId];
@@ -150,6 +172,7 @@ export default function SaleForm({
       drafts.push({
         id: sale?.id,
         productionId: entry.productionId,
+        salePointId: entry.salePointId || null,
         date: entry.date,
         packages: quantity,
         pricePerPackage: entry.donated ? 0 : price,
@@ -187,10 +210,13 @@ export default function SaleForm({
         />
       </>}
       <FormLayout className={styles["sales-form"]} onSubmit={submit} noValidate>
+        {(inventory?.status === "loading" || points?.status === "loading") && <p role="status">Carregando disponibilidade por ponto...</p>}
+        {(inventory?.status === "error" || points?.status === "error") && <EmptyState role="alert">Não foi possível carregar a disponibilidade por ponto. Recarregue a página antes de vender.</EmptyState>}
         <fieldset className={[styles["sales-cart"], !sale ? styles["sales-cart-layout"] : ""].filter(Boolean).join(" ")} disabled={isSaving}>
         {entries.map((entry, index) => {
           if (entry.key !== activeKey) return null;
           const selected = known[entry.productionId];
+          const reclassifying = canReclassifySale(sale, entry.productionId, Number(entry.packages));
           const available = selected ? availablePackages(selected, entry.key) : 0;
           const amount = amounts[index];
           return <section key={entry.key} className={styles["sales-cart-entry"]} aria-label={`Venda ${index + 1}`}>
@@ -202,6 +228,7 @@ export default function SaleForm({
             
             <RemoteSelect
               required
+              openOnFocus={!sale || !isModal}
               value={entry.productionId}
               placeholder="Selecione uma produção"
               selectedLabel={selected
@@ -213,7 +240,7 @@ export default function SaleForm({
               toOption={(balance: ProductionBalance) => {
                 // Prefer the copy already in the form so cart reservations are counted on the same totals.
                 const production = known[balance.id] ?? balance;
-                const left = availablePackages(production, entry.key);
+                const left = remainingPackages(production, soldPackages(production) + reservedPackages(production.id, entry.key));
                 return {
                   value: balance.id,
                   label: `${balance.recipeName} · ${dateLabel(balance.date)} · ${count(left)} disponíveis`,
@@ -229,6 +256,23 @@ export default function SaleForm({
                 });
               }}
             />
+          </FormField>
+          <FormField label="Ponto de venda (opcional)">
+            <SearchableSelect value={entry.salePointId} disabled={!locationsReady}
+              placeholder="Sem ponto" selectedLabel={!entry.salePointId ? "Sem ponto" : undefined}
+              options={[
+                { value: "", label: reclassifying ? "Sem ponto"
+                  : `Sem ponto · ${selected ? count(availablePackages(selected, entry.key, "")) : "0"} disponíveis` },
+                ...(points?.status === "ready" ? points.data.filter((point) => point.id !== null).map((point) => ({
+                  value: point.id!,
+                  label: reclassifying ? point.name
+                    : `${point.name} · ${selected ? count(availablePackages(selected, entry.key, point.id!)) : "0"} disponíveis`,
+                })) : []),
+              ]}
+              onChange={(salePointId) => updateEntry(entry.key, { salePointId })} />
+            <small>{reclassifying
+              ? "Mantendo a produção e a quantidade, trocar o ponto apenas reclassifica a venda, sem alterar o estoque."
+              : "Sem ponto vende apenas o saldo não distribuído. Selecione um ponto para usar o estoque dele."}</small>
           </FormField>
           <FormField label="Data da venda">
             
@@ -323,6 +367,9 @@ export default function SaleForm({
                   onClick={() => setActiveKey(entry.key)}>
                   <strong>{entry.customer.trim() || "Cliente não informado"}</strong>
                   <span>{production?.recipeName || "Selecione uma produção"}</span>
+                  <span>{entry.salePointId
+                    ? (points?.status === "ready" ? points.data.find((point) => point.id === entry.salePointId)?.name : undefined) || "Ponto selecionado"
+                    : "Sem ponto"}</span>
                   <span>{entry.donated ? "Doado" : amount.valid ? money(amount.quantity * amount.price) : "Valor inválido"} · {entry.packages || "—"} pacote(s)</span>
                   
                 </Button>
@@ -342,12 +389,13 @@ export default function SaleForm({
           onClick={() => {
             const activeEntry = entries.find((item) => item.key === activeKey) ?? entries[0];
             const activeProduction = known[activeEntry.productionId];
-            const production = activeProduction && availablePackages(activeProduction) > 0
+            const production = activeProduction && availablePackages(activeProduction, undefined, activeEntry.salePointId) > 0
               ? activeProduction
-              : Object.values(known).find((item) => availablePackages(item) > 0);
+              : Object.values(known).find((item) => availablePackages(item, undefined, activeEntry.salePointId) > 0);
             const entry = {
               ...createEntry(production),
               date: activeEntry.date,
+              salePointId: activeEntry.salePointId,
             };
             setEntries((current) => [...current, entry]);
             setActiveKey(entry.key);
@@ -364,7 +412,7 @@ export default function SaleForm({
             <strong>{validTotal ? money(total) : "—"}</strong>
           </div>
           <FormActions className={styles["sales-form-actions"]} onCancel={onCancel}
-            disabled={isSaving || !entries.every((entry) => entry.productionId)}
+            disabled={isSaving || !locationsReady || !entries.every((entry) => entry.productionId)}
             cancelDisabled={isSaving}
             submitLabel={<><Check size={17} aria-hidden="true" /> {isSaving ? "Salvando..." : sale ? "Salvar venda" : "Confirmar vendas"}</>} />
         </div>

@@ -14,6 +14,6 @@ export const overviewBalanceSortColumns = {
 export const overviewSalesSortColumns = { 0: "recipeName", 1: "customer", 2: "packages", 3: "total", 4: "paid" };
 export const consumptionSortColumns = { 0: "itemName", 1: "entryDate", 2: "quantity", 3: "cost" };
 export const balanceSortColumns = { 0: "recipeName", 1: "packages", 2: "sold", 3: "lostPackages", 4: "available" };
-export const salesSortColumns = { 0: "recipeName", 1: "customer", 2: "packages", 3: "pricePerPackage", 4: "total", 5: "paid" };
+export const salesSortColumns = { 0: "recipeName", 2: "packages", 3: "pricePerPackage", 4: "total" };
 export const stockSortColumns = { 0: "itemName", 1: "entryOrder", 2: "packageQty", 3: "packagePrice", 4: "remainingQty" };
 export const recipeIngredientSortColumns = { 0: "name", 1: "quantity", 2: "unit" };

@@ -5,6 +5,8 @@ import type {
   MarketItem, Recipe, RecipeEdit, Production, ProductionDiscard, Sale, StockEntry, StockCorrection, WorkspaceSummary,
 } from "../domain/models";
 import { workspaceService } from "../services/workspace";
+import { salePointsService } from "../services/salePoints";
+import type { SalePointAllocation } from "../domain/models";
 import { recipePatch } from "../domain/recipeEdits";
 import { queryService } from "../services/query";
 import { getApiErrorMessage } from "../services/http";
@@ -320,5 +322,11 @@ export function useWorkspaceData(userId: string) {
       productionMutation((version) => workspaceService.restoreProduction(id, version),
         "Não foi possível desfazer o descarte da produção."),
     saveProduction,
+    saveSalePoint: (point: { id?: string; name: string }) =>
+      revisionMutation((version) => salePointsService.save(point, version), "Recarregue os dados antes de salvar.", "Não foi possível salvar o ponto de venda."),
+    deleteSalePoint: (id: string) =>
+      revisionMutation((version) => salePointsService.remove(id, version), "Recarregue os dados antes de excluir.", "Não foi possível excluir o ponto de venda."),
+    allocateSalePoint: (id: string, allocations: SalePointAllocation[]) =>
+      revisionMutation((version) => salePointsService.allocate(id, allocations, version), "Recarregue os dados antes de distribuir.", "Não foi possível distribuir os pacotes."),
   };
 }

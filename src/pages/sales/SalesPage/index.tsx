@@ -119,7 +119,7 @@ export default function Sales({
           <span className={styles["range-label"]}>{range.from ? `${dateLabel(range.from)} a ${dateLabel(range.to ?? "")}` : `Todo o histórico até ${dateLabel(range.to ?? "")}`}</span>
         </div>
       </Panel>
-      {report.status === "error" ? <Panel className={styles["sales-section"]}><p role="alert">Não foi possível carregar os indicadores de vendas. Recarregue a página para tentar novamente.</p></Panel>
+      {report.status === "error" ? <Panel className={styles["sales-section"]}><EmptyState role="alert">Não foi possível carregar os indicadores de vendas. Recarregue a página para tentar novamente.</EmptyState></Panel>
         : report.data ? <SalesOverview report={report.data} pagination={report.pagination} onPending={() => {
           onPaymentChange("pending");
           historyRef.current?.focus({ preventScroll: true });
@@ -139,15 +139,16 @@ export default function Sales({
           <span>{count(sales.pagination.totalCount)} registro(s) encontrado(s)</span>
         </div>
         {sales.status === "loading" && <p role="status">Atualizando histórico de vendas...</p>}
-        {sales.status === "error" ? <p role="alert">Não foi possível carregar o histórico de vendas.</p> : sales.items.length ? (
+        {sales.status === "error" ? <EmptyState role="alert">Não foi possível carregar o histórico de vendas.</EmptyState> : sales.items.length ? (
           <DataTable variant="sales" serverSort={sales.serverSort} aria-busy={sales.status === "loading"}><thead>
-            <tr><th>Venda / produção</th><th>Cliente</th><th>Pacotes</th><th>Preço / pacote</th><th>Total</th><th>Pagamento</th><th>Ações</th></tr>
+            <tr><th>Venda / produção</th><th>Cliente</th><th>Pacotes</th><th>Preço / pacote</th><th>Total</th><th>Pagamento</th><th>Local</th><th>Ações</th></tr>
           </thead><tbody>{sales.items.map((sale) => <tr key={sale.id}>
             <td><strong>{sale.recipeName}</strong><small>Venda: {dateLabel(sale.date)} · produção: {dateLabel(sale.productionDate)}</small>
               {sale.notes && <small className={styles["sales-notes"]}>{sale.notes}</small>}</td>
             <td>{sale.customer || "—"}</td><td>{count(sale.packages)}</td><td>{money(sale.pricePerPackage)}</td>
             <td className={styles["price-cell"]}>{money(sale.packages * sale.pricePerPackage)}</td>
             <td><PaymentBadge paid={sale.paid} donated={sale.donated} /></td>
+            <td>{sale.salePointName || "Sem ponto"}</td>
             <td><div className={styles["sales-row-actions"]}>
               <IconButton title="Visualizar produção" aria-label={`Visualizar produção de ${sale.recipeName}`}
                 onClick={() => onViewProduction(sale.productionId)}><Eye size={16} aria-hidden="true" /></IconButton>
