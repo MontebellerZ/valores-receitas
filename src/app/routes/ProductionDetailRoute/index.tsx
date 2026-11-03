@@ -3,6 +3,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import ProductionDetailPage from "../../../pages/production/ProductionDetailPage";
 import NotFoundPage from "../../../pages/not-found/NotFoundPage";
 import EmptyState from "../../../components/ui/EmptyState";
+import LoadingState from "../../../components/ui/LoadingState";
 import { useWorkspaceContext } from "../../../hooks/useWorkspaceContext";
 import { useResource } from "../../../hooks/useResource";
 import { useProductionReport } from "../../../hooks/useProductionReport";
@@ -37,7 +38,7 @@ export default function ProductionDetailRoute() {
     defaultSort: { sortBy: "entryDate", descending: false }, errorMessage: "Não foi possível carregar os lotes consumidos.",
   });
   if (resource.status === "loading")
-    return <div role="status">Carregando produção...</div>;
+    return <LoadingState>Carregando produção...</LoadingState>;
   if (resource.status === "error")
     return <EmptyState role="alert">Não foi possível carregar a produção. Recarregue a página.</EmptyState>;
   if (!production)

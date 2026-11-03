@@ -8,6 +8,7 @@ import UnsavedChangesBar from "../../components/ui/UnsavedChangesBar";
 import type { UserSession } from "../../domain/models";
 import { useWorkspace } from "../../hooks/useWorkspace";
 import { useSalePoints } from "../../hooks/useSalePointData";
+import LoadingState from "../../components/ui/LoadingState";
 
 type Props = { session: UserSession; signOut: () => void };
 
@@ -39,7 +40,7 @@ export default function Workspace({ session, signOut }: Props) {
             onSave={() => void workspace.saveChanges().catch(() => { /* Cancelled, or reported by the workspace. */ })}
           />
         )}
-        {workspace.isLoading ? <div role="status">Carregando seus dados...</div> : <Outlet context={workspace} />}
+        {workspace.isLoading ? <LoadingState>Carregando seus dados...</LoadingState> : <Outlet context={workspace} />}
       </AppLayout>
       <ConfirmDeleteDialog
         pendingDelete={workspace.pendingDelete}

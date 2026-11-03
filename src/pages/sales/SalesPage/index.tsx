@@ -2,6 +2,7 @@ import Button from "../../../components/ui/Button";
 import IconButton from "../../../components/ui/IconButton";
 import DataTable from "../../../components/ui/DataTable";
 import EmptyState from "../../../components/ui/EmptyState";
+import LoadingState from "../../../components/ui/LoadingState";
 import Pagination from "../../../components/ui/Pagination";
 import SearchField from "../../../components/ui/SearchField";
 import RemoteSelect from "../../../components/ui/RemoteSelect";
@@ -125,7 +126,7 @@ export default function Sales({
           historyRef.current?.focus({ preventScroll: true });
           historyRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
         }} />
-          : <Panel className={styles["sales-section"]}><p role="status">Carregando indicadores de vendas...</p></Panel>}
+          : <Panel className={styles["sales-section"]}><LoadingState>Carregando indicadores de vendas...</LoadingState></Panel>}
       <Panel id="sales-history" ref={historyRef} tabIndex={-1} className={styles["sales-section"]} title="Histórico de vendas"
         description="Consulte vendas e doações. A busca e o pagamento abaixo filtram apenas este histórico."
         action={<SearchField className={styles["sales-search"]} aria-label="Buscar vendas" placeholder="Cliente, produto ou observação..."
@@ -138,7 +139,7 @@ export default function Sales({
           </div>
           <span>{count(sales.pagination.totalCount)} registro(s) encontrado(s)</span>
         </div>
-        {sales.status === "loading" && <p role="status">Atualizando histórico de vendas...</p>}
+        {sales.status === "loading" && <LoadingState>Atualizando histórico de vendas...</LoadingState>}
         {sales.status === "error" ? <EmptyState role="alert">Não foi possível carregar o histórico de vendas.</EmptyState> : sales.items.length ? (
           <DataTable variant="sales" serverSort={sales.serverSort} aria-busy={sales.status === "loading"}><thead>
             <tr><th>Venda / produção</th><th>Cliente</th><th>Pacotes</th><th>Preço / pacote</th><th>Total</th><th>Pagamento</th><th>Local</th><th>Ações</th></tr>
@@ -163,9 +164,9 @@ export default function Sales({
         {sales.pagination.totalCount > 0 && <Pagination {...sales.pagination} label="vendas" />}
       </Panel>
       <details className={styles["balance-details"]}>
-        <summary><ShoppingBag size={18} aria-hidden="true" /><span>Disponível para vender<small>Saldo atual de todas as produções, independente do período</small></span><strong>{summary ? `${count(availablePackages)} pacotes` : "Carregando..."}</strong></summary>
+        <summary><ShoppingBag size={18} aria-hidden="true" /><span>Disponível para vender<small>Saldo atual de todas as produções, independente do período</small></span><strong>{summary ? `${count(availablePackages)} pacotes` : <span className={styles["loading-summary"]}>Carregando...</span>}</strong></summary>
       <Panel className={styles["sales-section"]} title="Saldo por produção">
-        {balances.status === "loading" && <p role="status">Atualizando saldo das produções...</p>}
+        {balances.status === "loading" && <LoadingState>Atualizando saldo das produções...</LoadingState>}
         {balances.items.length ? (
           <DataTable variant="sales" serverSort={balances.serverSort} aria-busy={balances.status === "loading"}><thead>
                 <tr>

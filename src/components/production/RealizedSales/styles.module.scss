@@ -1,6 +1,12 @@
-@use "../../../styles/shared";
+.price-cell {
+  color: #517559 !important;
+  font-weight: 600;
+}
 
-@include shared.table-annotations;
+.sales-notes {
+  max-width: 250px;
+  white-space: pre-wrap;
+}
 
 .realized-sales-history {
   margin-top: 16px;

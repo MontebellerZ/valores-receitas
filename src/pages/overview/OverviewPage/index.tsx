@@ -1,5 +1,6 @@
 import Button from "../../../components/ui/Button";
 import EmptyState from "../../../components/ui/EmptyState";
+import LoadingState from "../../../components/ui/LoadingState";
 import IconButton from "../../../components/ui/IconButton";
 import DataTable from "../../../components/ui/DataTable";
 import FormField from "../../../components/ui/FormField";
@@ -130,7 +131,7 @@ export default function Overview({
 
       {financial.status === "error" || financial.status === "missing" ?
         <Panel><EmptyState role="alert">Não foi possível carregar os resultados do negócio. Recarregue a página para tentar novamente.</EmptyState></Panel>
-        : !totals ? <Panel><p role="status">Carregando resultados do negócio...</p></Panel> : <>
+        : !totals ? <Panel><LoadingState>Carregando resultados do negócio...</LoadingState></Panel> : <>
         <section className={styles.hero} aria-label="Resultados do negócio">
           <div className={styles["hero-heading"]}>
             <div><span className={styles.eyebrow}><ChartNoAxesCombined size={16} aria-hidden="true" /> PANORAMA DO NEGÓCIO</span>
@@ -183,7 +184,7 @@ export default function Overview({
       </>}
 
       {summaryStatus === "error" ? <Panel><EmptyState role="alert">Não foi possível carregar os indicadores de produção e estoque. Recarregue a página para tentar novamente.</EmptyState></Panel>
-        : summaryStatus !== "ready" ? <Panel><p role="status">Carregando produção e estoque...</p></Panel> : <>
+        : summaryStatus !== "ready" ? <Panel><LoadingState>Carregando produção e estoque...</LoadingState></Panel> : <>
       <section className={styles["operations-band"]} aria-label="Produção e estoque do período">
         <div><Package size={21} aria-hidden="true" /><span>DA PRODUÇÃO À VENDA<small>{count(planning.count)} produções no período</small></span></div>
         <dl><div><dt>Pacotes produzidos</dt><dd>{count(planning.packages)}</dd></div>
@@ -199,7 +200,7 @@ export default function Overview({
               Ver produção <ArrowRight size={14} aria-hidden="true" />
             </Button>
           }>
-          {progress.status === "loading" && <p role="status">Atualizando giro das produções...</p>}
+          {progress.status === "loading" && <LoadingState>Atualizando giro das produções...</LoadingState>}
           {progress.status === "error" ? <EmptyState>Não foi possível carregar as produções do período.</EmptyState> : progress.items.length ? (
             <div className={styles["overview-production-progress"]} aria-busy={progress.status === "loading"}>
               {progress.items.map(describe).map((production) => {
@@ -316,7 +317,7 @@ export default function Overview({
             Ver todas <ArrowRight size={14} aria-hidden="true" />
           </Button>
         }>
-        {productions.status === "loading" && <p role="status">Atualizando produções...</p>}
+        {productions.status === "loading" && <LoadingState>Atualizando produções...</LoadingState>}
         {productions.status === "error" ? <EmptyState>Não foi possível carregar as produções do período.</EmptyState> : productions.items.length ? (
           <DataTable variant="sales" serverSort={productions.serverSort} aria-busy={productions.status === "loading"}><thead>
                 <tr>
@@ -408,7 +409,7 @@ export default function Overview({
             Ver vendas <ArrowRight size={14} aria-hidden="true" />
           </Button>
         }>
-        {recent.status === "loading" && <p role="status">Atualizando movimentações...</p>}
+        {recent.status === "loading" && <LoadingState>Atualizando movimentações...</LoadingState>}
         {recent.status === "error" ? <EmptyState>Não foi possível carregar as vendas do período.</EmptyState> : recent.items.length ? (
           <DataTable variant="sales" serverSort={recent.serverSort} aria-busy={recent.status === "loading"}><thead>
                 <tr>

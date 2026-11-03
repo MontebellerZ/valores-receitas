@@ -1,6 +1,41 @@
-@use "../../../styles/shared";
+.icon-button {
+  display: grid;
+  place-items: center;
+  width: 31px;
+  height: 31px;
+  border: 1px solid #eceee9;
+  border-radius: 7px;
+  background: #fff;
+  color: #8c948a;
+}
 
-@include shared.icon-buttons;
+.danger-button:hover,
+.mini-icon-button:hover {
+  border-color: #efdcd7;
+  background: #fff8f6;
+  color: #ba6c5c;
+}
+
+.mini-icon-button {
+  width: 24px;
+  height: 24px;
+  display: grid;
+  place-items: center;
+  border: 1px solid transparent;
+  border-radius: 5px;
+  background: transparent;
+  color: #a0a69d;
+}
+
+.mini-icon-button:hover {
+  background: #f8f9f7;
+}
+
+.delete-item:hover {
+  border-color: #efdcd7;
+  background: #fff8f6;
+  color: #ba6c5c;
+}
 
 .view-item {
   width: 36px;

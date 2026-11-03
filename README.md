@@ -255,7 +255,6 @@ As telas são carregadas sob demanda.
 | [src/domain](src/domain)                           | Modelos, cálculos, resumos e regras de estoque/datas, sem React ou HTTP. |
 | [src/utils](src/utils)                             | Formatação e parsing compartilhados.                                     |
 | [src/types/navigation.ts](src/types/navigation.ts) | Contratos de navegação e confirmação de exclusão.                        |
-| [src/styles/_shared.scss](src/styles/_shared.scss) | Mixins reutilizados pelos módulos, sem emitir CSS global por conta própria. |
 | [src/index.css](src/index.css)                     | Tema, fontes e resets básicos do documento.                             |
 | [src/main.tsx](src/main.tsx)                       | Montagem do React, roteador e notificações.                              |
 | [src/assets/brand](src/assets/brand)               | Logos importadas pelo Vite.                                              |
@@ -340,13 +339,13 @@ NomeDoComponente/
 
 Componentes com apresentação própria importam seu módulo de estilos e usam as classes pelo objeto `styles`, inclusive para estados condicionais. Os imports dos componentes apontam para a pasta, sem precisar informar `index.tsx`. Componentes que apenas compõem outros (como adaptadores de rotas e workspace) mantêm o módulo reservado, sem estilos artificiais.
 
-Regras de botões, campos, tabelas e outros padrões pertencem ao módulo do componente compartilhado. Mixins de `src/styles/_shared.scss` apoiam esses componentes e os layouts; não devem ser incluídos numa tela para reproduzir uma UI já existente. Regras responsivas permanecem junto ao componente responsável. Nas telas ficam composição, larguras e ajustes locais de layout. Use `className` ou `containerClassName` para esses ajustes, sem depender de classes internas de outro CSS Module.
+Regras de botões, campos, tabelas e outros padrões pertencem ao módulo do componente compartilhado. Cada componente importa seu próprio módulo; estilos específicos de uma tela ficam no módulo dessa tela, junto à composição, às larguras e aos ajustes locais de layout. Regras responsivas permanecem junto ao componente responsável. Use `className` ou `containerClassName` para ajustes de layout, sem depender de classes internas de outro CSS Module.
 
 O CSS global contém apenas fontes, variáveis do tema e resets do documento. As personalizações do React Toastify ficam no módulo de `Notifications`, com `:global` restrito aos seletores da biblioteca dentro do contêiner local. Erros que precisam de explicação ou ação usam `showErrorToast` e o componente compartilhado `ToastMessage`; mensagens curtas de sucesso, informação e validação pontual podem continuar como chamadas simples ao React Toastify.
 
 ### Campos de formulário
 
-Inputs de texto, números, datas e senhas e áreas de texto usam [FormControl](src/components/ui/FormControl/index.tsx), com rótulos compostos por [FormField](src/components/ui/FormField/index.tsx). Todos os selects usam [SearchableSelect](src/components/ui/SearchableSelect/index.tsx), extraído do seletor de insumos das receitas, que reutiliza o mesmo FormControl. Buscas usam [SearchField](src/components/ui/SearchField/index.tsx). O estilo compartilhado centraliza bordas, espaçamento, foco, placeholder, estados desabilitados e indicação de erro.
+Inputs de texto, números, datas e senhas e áreas de texto usam [FormControl](src/components/ui/FormControl/index.tsx), com rótulos compostos por [FormField](src/components/ui/FormField/index.tsx). Todos os selects usam [SearchableSelect](src/components/ui/SearchableSelect/index.tsx), extraído do seletor de insumos das receitas, que reutiliza o mesmo FormControl. Buscas usam [SearchField](src/components/ui/SearchField/index.tsx). O módulo do FormControl centraliza bordas, espaçamento, foco, placeholder, estados desabilitados e indicação de erro.
 
 ```tsx
 <FormField label="Horas por receita">

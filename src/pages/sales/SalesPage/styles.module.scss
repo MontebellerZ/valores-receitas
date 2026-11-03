@@ -1,6 +1,12 @@
-@use "../../../styles/shared";
+.price-cell {
+  color: #517559 !important;
+  font-weight: 600;
+}
 
-@include shared.table-annotations;
+.sales-notes {
+  max-width: 250px;
+  white-space: pre-wrap;
+}
 
 .sales-section {
   scroll-margin-top: 24px;
@@ -77,6 +83,7 @@
     > strong { font-size: 13px; white-space: nowrap; }
     &::after { content: "+"; font-size: 20px; }
   }
+  .loading-summary { color: var(--muted); font-size: 12px; font-weight: 400; }
   &[open] > summary::after { content: "−"; }
   > section { margin: 0; border: 0; border-top: 1px solid var(--line); border-radius: 0 0 12px 12px; box-shadow: none; }
 }

@@ -1,8 +1,64 @@
-@use "../../../styles/shared";
+.welcome-actions {
+  display: flex;
+  gap: 9px;
+}
 
-@include shared.page-actions;
+@media (max-width: 680px) {
+  .welcome-actions {
+    width: 100%;
+  }
 
-@include shared.feedback;
+  .welcome-actions > button,
+  .welcome-actions > a {
+    flex: 1;
+    padding: 0 9px;
+    font-size: 10px;
+  }
+}
+
+@media (max-width: 680px) {
+  .welcome-actions > button,
+  .welcome-actions > a {
+    font-size: 11px;
+  }
+}
+
+.positive,
+.text-positive {
+  color: #5b9367;
+}
+
+.text-negative {
+  color: #bb6458;
+}
+
+.footnote {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 13px 1px 0;
+  color: #9ba198;
+  font-size: 9px;
+}
+
+.footnote svg {
+  color: #80a286;
+}
+
+.formula-note {
+  margin-top: 9px;
+  color: #9da39a;
+  font-size: 8px;
+  line-height: 1.5;
+}
+
+.footnote {
+  font-size: 11px;
+}
+
+.formula-note {
+  font-size: 10px;
+}
 
 .overview-dashboard {
   min-width: 0;

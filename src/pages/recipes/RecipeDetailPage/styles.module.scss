@@ -1,3 +1,36 @@
-@use "../../../styles/shared";
+.positive,
+.text-positive {
+  color: #5b9367;
+}
 
-@include shared.feedback;
+.text-negative {
+  color: #bb6458;
+}
+
+.footnote {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 13px 1px 0;
+  color: #9ba198;
+  font-size: 9px;
+}
+
+.footnote svg {
+  color: #80a286;
+}
+
+.formula-note {
+  margin-top: 9px;
+  color: #9da39a;
+  font-size: 8px;
+  line-height: 1.5;
+}
+
+.footnote {
+  font-size: 11px;
+}
+
+.formula-note {
+  font-size: 10px;
+}

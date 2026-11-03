@@ -6,6 +6,7 @@ import type { ListControls, QueryStatus } from "../../../hooks/usePagedQuery";
 import Button from "../../ui/Button";
 import DataTable, { type ServerSort } from "../../ui/DataTable";
 import EmptyState from "../../ui/EmptyState";
+import LoadingState from "../../ui/LoadingState";
 import FormControl from "../../ui/FormControl";
 import Icon from "../../ui/Icon";
 import IconButton from "../../ui/IconButton";
@@ -88,12 +89,13 @@ export default function RecipeIngredientsEditor({
         </tr>;
       })}</tbody>
     </DataTable>
-    {!rows.length && <EmptyState>
-      {status === "loading" ? "Carregando ingredientes..."
-        : status === "error" ? "Não foi possível carregar os ingredientes."
+    {!rows.length && (status === "loading"
+      ? <LoadingState>Carregando ingredientes...</LoadingState>
+      : <EmptyState>
+        {status === "error" ? "Não foi possível carregar os ingredientes."
           : search ? "Nenhum ingrediente encontrado."
             : marketCount ? "Adicione insumos e informe a quantidade usada em cada receita." : "Cadastre insumos primeiro para incluí-los na receita."}
-    </EmptyState>}
+      </EmptyState>)}
     {(pagination.totalCount > 10 || pagination.page > 1) && <Pagination {...pagination} label="ingredientes" />}
     {!canAdd && totalCount > 0 && <p className={styles.hint}>
       {hasEmptyRow ? "Escolha o insumo da linha adicionada antes de incluir outra."

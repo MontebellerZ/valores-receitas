@@ -12,6 +12,7 @@ import Button, { ButtonLink } from "../../../components/ui/Button";
 import IconButton from "../../../components/ui/IconButton";
 import DataTable from "../../../components/ui/DataTable";
 import EmptyState from "../../../components/ui/EmptyState";
+import LoadingState from "../../../components/ui/LoadingState";
 import RegistrationModal from "../../../components/ui/RegistrationModal";
 import ConfirmDeleteDialog from "../../../components/ui/ConfirmDeleteDialog";
 import FormLayout, { FormGrid } from "../../../components/ui/FormLayout";
@@ -101,7 +102,7 @@ export default function SalePointsPage({ points, inventory, range, onRangeChange
         <FormField label="Vendas até"><FormControl type="date" value={range.to} min={range.from || undefined} max={localToday()}
           onChange={(event) => onRangeChange({ ...range, to: event.target.value })} /></FormField>
       </FormGrid>
-      {points.status === "loading" && <p role="status">Carregando pontos de venda...</p>}
+      {points.status === "loading" && <LoadingState>Carregando pontos de venda...</LoadingState>}
       {points.status === "error" && <EmptyState role="alert">Não foi possível carregar os pontos de venda. Recarregue a página.</EmptyState>}
       {points.status === "ready" && <DataTable defaultSort={{ column: 4, direction: "descending" }}>
         <thead><tr><th>Ponto</th><th>Disponíveis agora</th><th>Vendidos</th><th>Doados</th><th>Faturamento</th><th>Custo das saídas</th><th>Ações</th></tr></thead>
@@ -122,7 +123,7 @@ export default function SalePointsPage({ points, inventory, range, onRangeChange
       </DataTable>}
     </Panel>
     <Panel title="Estoque por ponto" description="Distribua ou transfira os pacotes disponíveis. Pacotes não distribuídos ficam em Sem ponto; vendas já registradas não mudam.">
-      {inventory.status === "loading" && <p role="status">Carregando estoque por ponto...</p>}
+      {inventory.status === "loading" && <LoadingState>Carregando estoque por ponto...</LoadingState>}
       {inventory.status === "error" && <EmptyState role="alert">Não foi possível carregar o estoque. Recarregue a página.</EmptyState>}
       {inventory.status === "ready" && points.status === "ready" && <div className={styles["point-cards"]}>
         {locations.map((point) => {

@@ -3,6 +3,7 @@ import FormLayout, { FormGrid } from "../../ui/FormLayout";
 import FormField from "../../ui/FormField";
 import FormControl from "../../ui/FormControl";
 import EmptyState from "../../ui/EmptyState";
+import LoadingState from "../../ui/LoadingState";
 import RemoteSelect from "../../ui/RemoteSelect";
 import SearchableSelect from "../../ui/SearchableSelect";
 import type { Resource } from "../../../hooks/useResource";
@@ -210,7 +211,7 @@ export default function SaleForm({
         />
       </>}
       <FormLayout className={styles["sales-form"]} onSubmit={submit} noValidate>
-        {(inventory?.status === "loading" || points?.status === "loading") && <p role="status">Carregando disponibilidade por ponto...</p>}
+        {(inventory?.status === "loading" || points?.status === "loading") && <LoadingState>Carregando disponibilidade por ponto...</LoadingState>}
         {(inventory?.status === "error" || points?.status === "error") && <EmptyState role="alert">Não foi possível carregar a disponibilidade por ponto. Recarregue a página antes de vender.</EmptyState>}
         <fieldset className={[styles["sales-cart"], !sale ? styles["sales-cart-layout"] : ""].filter(Boolean).join(" ")} disabled={isSaving}>
         {entries.map((entry, index) => {

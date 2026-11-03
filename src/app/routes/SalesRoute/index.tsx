@@ -3,6 +3,7 @@ import { useMatch, useNavigate, useParams } from "react-router-dom";
 import SalesPage from "../../../pages/sales/SalesPage";
 import NotFoundPage from "../../../pages/not-found/NotFoundPage";
 import EmptyState from "../../../components/ui/EmptyState";
+import LoadingState from "../../../components/ui/LoadingState";
 import { useWorkspaceContext } from "../../../hooks/useWorkspaceContext";
 import { useDebouncedValue } from "../../../hooks/useDebouncedValue";
 import { listControls, usePagedQuery } from "../../../hooks/usePagedQuery";
@@ -95,9 +96,9 @@ export default function SalesRoute() {
           navigate(id ? paths.production(id) : paths.productions)
         }
       />
-      {saleId && editing.status === "loading" && <div role="status">Carregando venda...</div>}
+      {saleId && editing.status === "loading" && <LoadingState>Carregando venda...</LoadingState>}
       {saleId && editing.status === "error" && <EmptyState role="alert">Não foi possível carregar a venda. Recarregue a página.</EmptyState>}
-      {creating && firstAvailable.status === "loading" && <div role="status">Carregando produções disponíveis...</div>}
+      {creating && firstAvailable.status === "loading" && <LoadingState>Carregando produções disponíveis...</LoadingState>}
       {creating && firstAvailable.status !== "loading" && (
         <SaleForm
           key="new-sale"

@@ -1,4 +1,99 @@
-@use "../../../styles/shared";
+a.button {
+  text-decoration: none;
+}
 
-@include shared.buttons;
-@include shared.text-actions;
+a.button:focus-visible {
+  outline: 3px solid #aec9b4;
+  outline-offset: 2px;
+}
+
+.button {
+  height: 38px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 0 14px;
+  border-radius: 7px;
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+  transition: background 0.16s,
+    border-color 0.16s,
+    transform 0.16s;
+}
+
+.button:active {
+  transform: translateY(1px);
+}
+
+.button-primary {
+  border: 1px solid var(--green);
+  background: var(--green);
+  color: #fff;
+  box-shadow: 0 2px 4px #4369581b;
+}
+
+.button-primary:hover {
+  border-color: var(--green-dark);
+  background: var(--green-dark);
+}
+
+.button-secondary {
+  border: 1px solid #e3e7e0;
+  background: #fff;
+  color: #687168;
+}
+
+.button-secondary:hover {
+  border-color: #b9c9bb;
+  background: #fbfdfb;
+  color: var(--green);
+}
+
+.button-small {
+  height: 33px;
+  padding: 0 11px;
+  font-size: 10px;
+}
+
+.button {
+  font-size: 13px;
+}
+
+.button-small {
+  font-size: 12px;
+}
+
+.text-button,
+.inline-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  border: 0;
+  background: none;
+  color: #6b746b;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.text-button:hover,
+.inline-link:hover {
+  color: var(--green);
+}
+
+.inline-link {
+  padding: 2px 0;
+  color: #63816a;
+  font-size: 9px;
+  white-space: nowrap;
+}
+
+.text-button,
+.inline-link {
+  font-size: 13px;
+}
+
+.inline-link {
+  font-size: 11px;
+}

@@ -2,6 +2,7 @@ import { lazy, Suspense } from "react";
 import { useSession } from "../hooks/useSession";
 import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { getLoginDestination, paths } from "./paths";
+import LoadingState from "../components/ui/LoadingState";
 const Workspace = lazy(() => import("./Workspace"));
 const AuthPage = lazy(() => import("../pages/auth/AuthPage"));
 const OverviewRoute = lazy(() => import("./routes/OverviewRoute"));
@@ -22,8 +23,8 @@ export default function App() {
   const location = useLocation();
   if (!sessionChecked)
     return (
-      <main  role="status">
-        Verificando sessão...
+      <main>
+        <LoadingState>Verificando sessão...</LoadingState>
       </main>
     );
   const search = new URLSearchParams(location.search);
@@ -41,7 +42,7 @@ export default function App() {
     );
 
   return (
-    <Suspense fallback={<main role="status">Carregando tela...</main>}>
+    <Suspense fallback={<main><LoadingState>Carregando tela...</LoadingState></main>}>
       <Routes>
         <Route path={paths.login} element={authenticationPage} />
         <Route path={paths.register} element={authenticationPage} />

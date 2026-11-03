@@ -1,4 +1,62 @@
-@use "../../../styles/shared";
+.panel {
+  min-width: 0;
+  border: 1px solid #eceee9;
+  border-radius: 10px;
+  background: #fff;
+  box-shadow: 0 2px 5px rgba(32, 42, 31, 0.015);
+}
 
-@include shared.panels;
-@include shared.empty-states;
+.empty-state,
+.empty-inline {
+  padding: 35px 15px;
+  color: #92988f;
+  font-size: 11px;
+  text-align: center;
+}
+
+.empty-editor {
+  min-height: 260px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  text-align: center;
+}
+
+.empty-illustration {
+  display: grid;
+  place-items: center;
+  width: 53px;
+  height: 53px;
+  margin-bottom: 15px;
+  border-radius: 16px;
+  background: #eff4ef;
+  color: #63826a;
+}
+
+.empty-editor h2 {
+  color: #3d463e;
+  font-family: Manrope, sans-serif;
+  font-size: 14px;
+}
+
+.empty-editor p {
+  max-width: 250px;
+  margin: 7px 0 15px;
+  color: #92988f;
+  font-size: 10px;
+}
+
+.empty-state,
+.empty-inline {
+  font-size: 13px;
+}
+
+.empty-editor h2 {
+  font-size: 16px;
+}
+
+.empty-editor p {
+  font-size: 12px;
+}
