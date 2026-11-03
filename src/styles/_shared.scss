@@ -295,8 +295,23 @@
     grid-template-columns: minmax(180px, 1fr) minmax(0, 1.3fr) 36px;
     align-items: center;
     gap: 20px;
-    padding: 20px 0;
+    padding: 20px 12px;
     border-bottom: 1px solid var(--line);
+    transition: background-color 120ms ease;
+    background-image: linear-gradient(to right, #fff, transparent 24px, transparent calc(100% - 24px), #fff);
+  }
+  .item-summary:focus-within {
+    background-color: #f4f7f4;
+  }
+  @media (hover: hover) {
+    .item-summary:hover {
+      background-color: #f4f7f4;
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .item-summary {
+      transition: none;
+    }
   }
   .item-summary-name {
     min-width: 0;
